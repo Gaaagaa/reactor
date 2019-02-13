@@ -559,7 +559,8 @@ x_void_t x_tcp_io_server_t::thread_listen(void)
             continue;
         }
 
-        LOGI("accept() client : [local -> %s:%d] <=> [remote -> %s:%d]",
+        LOGI("accept() client[fd:%d] : [local -> %s:%d] <=> [remote -> %s:%d]",
+             xfdt_sockfd,
              sockfd_local_ip(xfdt_sockfd, LOG_BUF(64), 64),
              sockfd_local_port(xfdt_sockfd),
              sockfd_remote_ip(xfdt_sockfd, LOG_BUF(64), 64),

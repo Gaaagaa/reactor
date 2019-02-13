@@ -42,7 +42,7 @@ public:
      */
     typedef enum emConstValue
     {
-        ECV_CONNECTION_TYPE  = 0x0010,  ///< 业务层工作对象类型
+        ECV_CONNECTION_TYPE  = 0x0010,  ///< 业务层工作对象的连接类型
     } emConstValue;
 
     /**
