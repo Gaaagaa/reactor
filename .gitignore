@@ -1,4 +1,3 @@
 *.o
 tmp
-test
-bin/xreactor
+bin/reactor

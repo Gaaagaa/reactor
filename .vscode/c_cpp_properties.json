@@ -1,0 +1,29 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "defines": [
+                "__linux__",
+                "_DEBUG"
+            ],
+            "includePath": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/server",
+                "${workspaceFolder}/server/comm",
+                "${workspaceFolder}/server/xtcp",
+                "${workspaceFolder}/server/xftp",
+                "${workspaceFolder}/third/include",
+                "C:/LLVM/usr/include"
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": ""
+            },
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-x64",
+            "compilerPath": "C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/VC/Tools/MSVC/14.16.27023/bin/Hostx64/x64/cl.exe"
+        }
+    ],
+    "version": 4
+}
