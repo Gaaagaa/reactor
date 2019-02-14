@@ -217,7 +217,7 @@ x_uint32_t x_tcp_io_message_t::nio_read(x_sockfd_t xfdt_sockfd, x_uint32_t xut_m
         }
         else if (-1 == xit_bytes)
         {
-            if ((EAGAIN == errno) || (EWOULDBLOCK == errno))
+            if ((EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
                 xit_error = EAGAIN;
             else
                 xit_error = errno;
@@ -258,7 +258,7 @@ x_uint32_t x_tcp_io_message_t::nio_write(x_sockfd_t xfdt_sockfd, x_uint32_t xut_
                                       0);
         if (-1 == xit_bytes)
         {
-            if ((EAGAIN == errno) || (EWOULDBLOCK == errno))
+            if ((EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno))
                 xit_error = EAGAIN;
             else
                 xit_error = errno;
