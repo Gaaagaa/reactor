@@ -79,23 +79,7 @@ protected:
     {
     };
 
-#if 1
-    /**
-     * @class x_simulated_autolock_t
-     * @brief x_msg_queue_t 对象进行同步操作时，所使用的伪装锁（不做 加锁/解锁 操作，只做测试用）。
-     */
-    class x_simulated_autolock_t
-    {
-        // constructor/destructor
-    public:
-        explicit x_simulated_autolock_t(x_msg_queue_t & xmqueue) {  }
-        ~x_simulated_autolock_t(void) {  }
-    };
-
-    using x_mqautolock_t = x_simulated_autolock_t;
-#else
     using x_mqautolock_t = x_autospin_t< x_msg_queue_t >;
-#endif
 
     // constructor/destructor
 public:
