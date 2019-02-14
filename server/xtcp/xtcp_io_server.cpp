@@ -550,7 +550,7 @@ x_void_t x_tcp_io_server_t::thread_listen(void)
         xfdt_sockfd = accept(m_xfdt_listen, &xaddr_client, &xut_addrlen);
         if (-1 == xfdt_sockfd)
         {
-            if (!((EAGAIN == errno) || (EWOULDBLOCK == errno)))
+            if (!((EAGAIN == errno) || (EWOULDBLOCK == errno) || (EINTR == errno)))
             {
                 LOGE("[thread_index: 0] accept(m_xfdt_listen[%d], ...) return -1, last error : %d",
                      m_xfdt_listen, errno);
@@ -597,7 +597,11 @@ x_void_t x_tcp_io_server_t::thread_epollio(void)
         {
             struct epoll_event & xevent = xvec_events[xit_iter];
 
-            if ((xevent.events & EPOLLERR) || (xevent.events & EPOLLHUP))
+            if ((xevent.events & EPOLLERR  ) ||
+#ifdef EPOLLRDHUP
+                (xevent.events & EPOLLRDHUP) ||
+#endif // EPOLLRDHUP
+                (xevent.events & EPOLLHUP  ))
             {
                 io_handle_close(xit_nthread, xevent.data.fd);
                 continue;
