@@ -108,7 +108,6 @@ public:
      * 
      * @param [in ] xio_cwptr : 目标操作的 x_tcp_io_channel_t 对象。
      * @param [in ] xut_event : 任务对象所要处理事件（参看 emIoTaskEventType 枚举值）。
-     * 
      */
     explicit x_tcp_io_task_t(const x_io_cwptr_t & xio_cwptr, x_uint32_t xut_event);
     virtual ~x_tcp_io_task_t(void);
