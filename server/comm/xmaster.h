@@ -24,6 +24,7 @@
 #define __XMASTER_H__
 
 #include <map>
+#include "xmsg_handler.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // x_master_t
@@ -32,7 +33,7 @@
  * @class x_master_t
  * @brief 程序主进程的控制管理类。
  */
-class x_master_t : public x_event_observer_t< x_master_t, EM_EOT_MASTER >
+class x_master_t : public x_spec_subscriber_t< x_master_t, EM_EST_MASTER >
 {
     // common data types
 public:
@@ -46,14 +47,14 @@ public:
     } emConstValue;
 
     /**
-     * @enum  emEventKey
-     * @brief 定义观察者的事件索引键。
+     * @enum  emMsgKey
+     * @brief 定义订阅者的消息标识 ID。
      */
-    typedef enum emEventKey
+    typedef enum emMsgKey
     {
-        EVENT_KEY_SIGQUIT   = 0x00000100,  ///< 退出操作信号
-        EVENT_KEY_SIGCHLD   = 0x00000200,  ///< 工作进程结束
-    } emEventKey;
+        MSGID_SIGQUIT   = 0x00000100,  ///< 退出操作信号
+        MSGID_SIGCHLD   = 0x00000200,  ///< 工作进程结束
+    } emMsgKey;
 
     // common invoking
 private:
@@ -75,8 +76,8 @@ private:
     explicit x_master_t(void);
     ~x_master_t(void);
 
-    x_master_t(const x_master_t & xobject);
-    x_master_t & operator=(const x_master_t & xobject);
+    x_master_t(const x_master_t & xobject) = delete;
+    x_master_t & operator=(const x_master_t & xobject) = delete;
 
     // public interfaces
 public:
@@ -171,31 +172,31 @@ protected:
      */
     x_bool_t pull_worker(void);
 
-    // event handlers
+    // msg handlers
 protected:
     /**********************************************************/
     /**
-     * @brief 初始化事件通知的相关操作。
+     * @brief 初始化消息通知的相关操作。
      */
-    x_int32_t init_event_handler(void);
+    x_int32_t init_msg_handler(void);
 
     /**********************************************************/
     /**
-     * @brief 重置（反初始化）事件通知的相关操作。
+     * @brief 重置（反初始化）消息通知的相关操作。
      */
-    x_void_t reset_event_handler(void);
+    x_void_t reset_msg_handler(void);
 
     /**********************************************************/
     /**
-     * @brief 处理 退出信号 的事件。
+     * @brief 处理 退出信号 的消息。
      */
-    void on_event_sigquit(x_uint32_t xut_size, x_pvoid_t xpvt_dptr);
+    void on_msg_sigquit(x_uint32_t xut_size, x_pvoid_t xpvt_dptr);
 
     /**********************************************************/
     /**
-     * @brief 处理 工作进程结束 的事件。
+     * @brief 处理 工作进程结束 的消息。
      */
-    void on_event_sigchld(x_uint32_t xut_size, x_pvoid_t xpvt_dptr);
+    void on_msg_sigchld(x_uint32_t xut_size, x_pvoid_t xpvt_dptr);
 
     // data members
 protected:

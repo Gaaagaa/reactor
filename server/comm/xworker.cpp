@@ -22,6 +22,8 @@
 
 #include "xcomm.h"
 #include "xworker.h"
+#include "xmsg_handler.h"
+
 #include "xftp_server.h"
 
 #include <unistd.h>
@@ -128,8 +130,8 @@ x_int32_t x_worker_t::run(void)
 
     while (X_TRUE)
     {
-        if (x_event_handler_t::instance().event_queue_size() > 0)
-            x_event_handler_t::instance().app_notify_proc();
+        if (x_msg_handler_t::instance().queue_size() > 0)
+            x_msg_handler_t::instance().msg_dispatch();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }

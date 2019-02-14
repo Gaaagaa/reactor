@@ -23,6 +23,7 @@
 #include "xcomm.h"
 #include "xmaster.h"
 #include "xworker.h"
+#include "xconfig.h"
 
 #include <unistd.h>
 #include <signal.h>
@@ -173,7 +174,7 @@ x_void_t x_master_t::sig_handler(x_int32_t xit_signo)
 #if ((defined _DEBUG) || (defined DEBUG))
             ::_exit(0);
 #else // !((defined _DEBUG) || (defined DEBUG))
-            x_master_t::instance().post_event(EVENT_KEY_SIGQUIT, sizeof(x_int32_t), &xit_signo);
+            x_master_t::instance().post_msg(MSGID_SIGQUIT, sizeof(x_int32_t), &xit_signo);
 #endif // ((defined _DEBUG) || (defined DEBUG))
         }
         break;
@@ -188,7 +189,7 @@ x_void_t x_master_t::sig_handler(x_int32_t xit_signo)
                 break;
             }
 
-            x_master_t::instance().post_event(EVENT_KEY_SIGCHLD, sizeof(x_ssize_t), &xst_wpid);
+            x_master_t::instance().post_msg(MSGID_SIGCHLD, sizeof(x_ssize_t), &xst_wpid);
         }
         break;
 
@@ -283,8 +284,8 @@ x_int32_t x_master_t::startup(x_int32_t xit_argc, x_char_t * xct_argv[])
         // 设置可运行标识
         m_xbt_running = X_TRUE;
 
-        // 初始化事件通知的相关操作
-        init_event_handler();
+        // 初始化消息通知的相关操作
+        init_msg_handler();
 
         // 捕获特定信号进行处理
         if (!setup_signal())
@@ -324,8 +325,8 @@ RE_RUN:
         // 主进程分支
         while (m_xbt_running)
         {
-            if (x_event_handler_t::instance().event_queue_size() > 0)
-                x_event_handler_t::instance().app_notify_proc();
+            if (x_msg_handler_t::instance().queue_size() > 0)
+                x_msg_handler_t::instance().msg_dispatch();
 
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
@@ -347,7 +348,7 @@ x_void_t x_master_t::shutdown(void)
     cleanup(X_FALSE);
 
     // 关闭事件通知模块
-    x_event_handler_t::instance().close();
+    x_msg_handler_t::instance().close();
 
     // 关闭配置信息模块
     x_config_t::instance().close();
@@ -419,11 +420,11 @@ x_int32_t x_master_t::init_comm(x_int32_t xit_argc, x_char_t * xct_argv[])
         }
 
         // 打开事件通知模块
-        xit_error = x_event_handler_t::instance().open();
+        xit_error = x_msg_handler_t::instance().open();
         if (0 != xit_error)
         {
-            LOGE("x_event_handler_t::instance().open() return error code : %d", xit_error);
-            STD_TRACE("x_event_handler_t::instance().open() return error code : %d", xit_error);
+            LOGE("x_msg_handler_t::instance().open() return error code : %d", xit_error);
+            STD_TRACE("x_msg_handler_t::instance().open() return error code : %d", xit_error);
             break;
         }
 
@@ -487,8 +488,8 @@ x_void_t x_master_t::cleanup(x_bool_t xbt_worker_invoking)
     m_xmap_worker.clear();
 
     // 清除掉所有通知事件
-    x_event_handler_t::instance().cleanup_event_queue();
-    reset_event_handler();
+    x_msg_handler_t::instance().cleanup();
+    reset_msg_handler();
 }
 
 /**********************************************************/
@@ -685,55 +686,55 @@ x_bool_t x_master_t::pull_worker(void)
 //====================================================================
 
 // 
-// x_master_t : event handlers
+// x_master_t : msg handlers
 // 
 
 /**********************************************************/
 /**
- * @brief 初始化事件通知的相关操作。
+ * @brief 初始化消息通知的相关操作。
  */
-x_int32_t x_master_t::init_event_handler(void)
+x_int32_t x_master_t::init_msg_handler(void)
 {
-    XVERIFY(__obser_type::register_mkey(EVENT_KEY_SIGQUIT, &x_master_t::on_event_sigquit));
-    XVERIFY(__obser_type::register_mkey(EVENT_KEY_SIGCHLD, &x_master_t::on_event_sigchld));
-    XVERIFY(__obser_type::join_notify(this));
-    XVERIFY(__obser_type::register_event_notify());
+    XVERIFY(__obser_type::register_mkey(MSGID_SIGQUIT, &x_master_t::on_msg_sigquit));
+    XVERIFY(__obser_type::register_mkey(MSGID_SIGCHLD, &x_master_t::on_msg_sigchld));
+    XVERIFY(__obser_type::jointo_notify(this));
+    XVERIFY(__obser_type::register_msg_diapatch());
 
     return 0;
 }
 
 /**********************************************************/
 /**
- * @brief 重置（反初始化）事件通知的相关操作。
+ * @brief 重置（反初始化）消息通知的相关操作。
  */
-x_void_t x_master_t::reset_event_handler(void)
+x_void_t x_master_t::reset_msg_handler(void)
 {
     __obser_type::reset_notify();
-    __obser_type::unregister_event_notify();
+    __obser_type::unregister_msg_diapatch();
 }
 
 /**********************************************************/
 /**
- * @brief 处理 退出信号 的事件。
+ * @brief 处理 退出信号 的消息。
  */
-void x_master_t::on_event_sigquit(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
+void x_master_t::on_msg_sigquit(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
 {
     XASSERT(sizeof(x_int32_t) == xut_size);
-    LOGI("on_event_sigquit() signo : %d", *(x_int32_t *)xpvt_dptr);
+    LOGI("on_msg_sigquit() signo : %d", *(x_int32_t *)xpvt_dptr);
 
-    // 设置退出标识，迫使 run() 接口内的事件循环结束
+    // 设置退出标识，迫使 run() 接口内的消息循环结束
     m_xbt_running = X_FALSE;
 }
 
 /**********************************************************/
 /**
- * @brief 处理 工作进程结束 的事件。
+ * @brief 处理 工作进程结束 的消息。
  */
-void x_master_t::on_event_sigchld(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
+void x_master_t::on_msg_sigchld(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
 {
     XASSERT(sizeof(x_ssize_t) == xut_size);
 
-    LOGE("on_event_sigchld() worker pid : %lld", *(x_ssize_t *)xpvt_dptr);
+    LOGE("on_msg_sigchld() worker pid : %lld", *(x_ssize_t *)xpvt_dptr);
 
     erase_worker(*(x_ssize_t *)xpvt_dptr);
     pull_worker();

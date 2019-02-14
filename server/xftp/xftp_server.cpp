@@ -21,8 +21,9 @@
  */
 
 #include "xcomm.h"
-#include "xftp_server.h"
+#include "xconfig.h"
 
+#include "xftp_server.h"
 #include "xftp_msgctxt.h"
 #include "xftp_echo.h"
 
