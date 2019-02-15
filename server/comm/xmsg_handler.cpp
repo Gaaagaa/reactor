@@ -73,7 +73,7 @@ x_msg_handler_t::~x_msg_handler_t(void)
  */
 x_int32_t x_msg_handler_t::open(void)
 {
-    enable_auto_dispatch(X_FALSE);
+    enable_notify_callback(X_FALSE);
     return start([](x_handle_t xht_context) -> x_int32_t{ return 0; }, (x_handle_t)this);
 }
 

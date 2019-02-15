@@ -1,3 +1,4 @@
 *.o
 tmp
 bin/reactor
+test/xftp_echo_client/xecho

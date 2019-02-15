@@ -697,7 +697,7 @@ x_int32_t x_master_t::init_msg_handler(void)
 {
     XVERIFY(__obser_type::register_mkey(MSGID_SIGQUIT, &x_master_t::on_msg_sigquit));
     XVERIFY(__obser_type::register_mkey(MSGID_SIGCHLD, &x_master_t::on_msg_sigchld));
-    XVERIFY(__obser_type::jointo_notify(this));
+    XVERIFY(__obser_type::jointo_dispatch(this));
     XVERIFY(__obser_type::register_msg_diapatch());
 
     return 0;
@@ -709,7 +709,7 @@ x_int32_t x_master_t::init_msg_handler(void)
  */
 x_void_t x_master_t::reset_msg_handler(void)
 {
-    __obser_type::reset_notify();
+    __obser_type::reset_dispatch();
     __obser_type::unregister_msg_diapatch();
 }
 

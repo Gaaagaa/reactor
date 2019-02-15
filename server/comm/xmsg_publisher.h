@@ -27,6 +27,7 @@
 #include "xmempool.h"
 
 #include <mutex>
+#include <condition_variable>
 #include <map>
 #include <queue>
 
@@ -102,51 +103,11 @@ protected:
         ECV_MQUEUE_MAX_SIZE = 0x0000FFFF,    ///< 消息队列的默认最大容纳数量值
     } emConstValue;
 
-    using x_locker_t = std::mutex;
-
-    /**
-     * @class x_map_nofity_func_t [ 消息类型，消息分派接口函数，访问锁 ] 
-     * @brief 用于定义 消息类型的通知接口函数映射表。
-     */
-    class x_map_dispfunc_t : public std::map< x_uint32_t, x_func_dispatch_t >
-                           , public x_locker_t
-    {
-
-    };
-
-    /**
-     * @class x_msg_queue_t
-     * @brief 消息存储队列类型。
-     */
-    class x_msg_queue_t : public std::queue< x_msgctxt_t * >
-                        , public x_locker_t
-    {
-
-    };
-
-    /**
-     * @class x_autolock_t
-     * @brief 利用对象的 构造/析构 函数，辅助 x_locker_t 对象进行自动 加锁/解锁 操作。
-     */
-    class x_autolock_t
-    {
-        // constructor/destructor
-    public:
-        x_autolock_t(x_locker_t & xlocker)
-            : m_xlocker(xlocker)
-        {
-            m_xlocker.lock();
-        }
-
-        ~x_autolock_t(void)
-        {
-            m_xlocker.unlock();
-        }
-
-        // data members
-    private:
-        x_locker_t & m_xlocker; ///< 目标操作的锁对象
-    };
+    using x_locker_t       = std::mutex;
+    using x_autolock_t     = std::lock_guard< x_locker_t >;
+    using x_cvnotify_t     = std::condition_variable;
+    using x_map_dispfunc_t = std::map< x_uint32_t, x_func_dispatch_t >;
+    using x_msg_queue_t    = std::queue< x_msgctxt_t * >;
 
     // constructor/destructor
 public:
@@ -170,8 +131,8 @@ public:
      *      2、(X_NULL == xfunc_notify) 时，工作对象自身的工作线程执行通知操作。
      * </pre>
      * 
-     * @param [in ] xfunc_notify : 消息投递后的回调操作接口。
-     * @param [in ] xht_context  : 通知操作的 上下文描述句柄。
+     * @param [in ] xfunc_notify : 消息投递后的回调通知操作接口。
+     * @param [in ] xht_context  : 通知操作回调的 上下文描述句柄。
      * 
      * @return x_int32_t
      *         - 成功，返回 0；
@@ -197,11 +158,11 @@ public:
 
     /**********************************************************/
     /**
-     * @brief 标识通知消息是否自动分派（投递）。
+     * @brief 消息投递至队列后，是否进行回调通知。
      */
-    inline x_void_t enable_auto_dispatch(x_bool_t xbt_auto_dispatch)
+    inline x_void_t enable_notify_callback(x_bool_t xbt_notify)
     {
-        m_xbt_dispatch = xbt_auto_dispatch;
+        m_xbt_notify = xbt_notify;
     }
 
     /**********************************************************/
@@ -344,16 +305,21 @@ protected:
     // class data
 protected:
     x_func_notify_t  m_xfunc_notify;   ///< 消息投递后的回调操作接口
-    x_bool_t         m_xbt_dispatch;   ///< 标识消息队列中的消息是否自动分派
     x_handle_t       m_xht_context;    ///< 通知的线程 上下文描述句柄
+    x_bool_t         m_xbt_notify;     ///< 消息投递至队列后，是否进行回调通知
 
-    x_bool_t         m_xbt_running;    ///< 标识工作线程是否继续 事件通知流程
+    x_bool_t         m_xbt_running;    ///< 标识工作线程是否继续运行
     x_handle_t       m_xht_thread;     ///< 工作线程句柄
 
     x_mempool_t      m_xmsg_mempool;   ///< 消息对象所使用的内存池
 
+    x_locker_t       m_xlock_mapfunc;  ///< m_xmap_dispfunc 的同步操作锁
     x_map_dispfunc_t m_xmap_dispfunc;  ///< 订阅者的 消息分派接口 映射表
+
+    x_cvnotify_t     m_xmq_notify;     ///< 消息加入队列时使用的 条件通知变量
+    x_locker_t       m_xlock_queue;    ///< m_xmsg_queue 的同步操作锁
     x_msg_queue_t    m_xmsg_queue;     ///< 消息队列
+
     x_uint32_t       m_xut_max_qsize;  ///< 消息队列最大容纳的消息数量
     x_uint32_t       m_xut_discards;   ///< 统计丢弃的消息数量
 };

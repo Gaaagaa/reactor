@@ -53,7 +53,8 @@ public:
     using x_autolock_t = std::lock_guard< x_mlocker_t >;
     using x_mapthis_t  = std::map< x_typeid_t, x_this_t >;
 
-    static constexpr const x_typeid_t xid_broadcast = 0;  ///< 广播操作使用的 目标对象标识 ID
+    /** 广播操作使用的标识 ID */
+    static constexpr const x_typeid_t XID_BROADCAST = 0;
 
     // common invoking
 public:
@@ -62,7 +63,7 @@ public:
      * @brief 消息分派操作的入口函数。
      * 
      * @param [in ] xmkey    : 消息分派的 索引键。
-     * @param [in ] xid : 分派操作的目标对象标识 ID（为 xid_broadcast 时，则广播通知）。
+     * @param [in ] xid : 分派操作的目标对象标识 ID（为 XID_BROADCAST 时，则广播通知）。
      * @param [in ] xargs... : 分派操作的参数列表。
      */
     static void dispatch_entry(x_mkey_t xmkey, x_typeid_t xid, _Args ... xargs)
@@ -71,7 +72,7 @@ public:
 
         x_autolock_t xautolock(_S_xmt_locker);
 
-        if (xid_broadcast == xid)
+        if (XID_BROADCAST == xid)
         {
             for (itmap = _S_map_object.begin(); itmap != _S_map_object.end(); ++itmap)
             {
@@ -90,9 +91,9 @@ public:
 
     /**********************************************************/
     /**
-     * @brief 将订阅者对象加入消息通知队列。
+     * @brief 将订阅者对象加入消息分派的目标操作对象表。
      */
-    static bool jointo_notify(x_this_t xobject_ptr)
+    static bool jointo_dispatch(x_this_t xobject_ptr)
     {
         if (nullptr != xobject_ptr)
         {
@@ -109,9 +110,9 @@ public:
 
     /**********************************************************/
     /**
-     * @brief 将订阅者对象移出消息通知队列。
+     * @brief 将订阅者对象移出消息分派的目标操作对象表。
      */
-    static void remove_notify(x_this_t xobject_ptr)
+    static void remove_dispatch(x_this_t xobject_ptr)
     {
         if (nullptr != xobject_ptr)
         {

@@ -37,8 +37,8 @@
 
 x_msg_publisher_t::x_msg_publisher_t(void)
     : m_xfunc_notify(X_NULL)
-    , m_xbt_dispatch(X_TRUE)
     , m_xht_context(X_NULL)
+    , m_xbt_notify(X_TRUE)
     , m_xbt_running(X_FALSE)
     , m_xht_thread(X_NULL)
     , m_xut_max_qsize(ECV_MQUEUE_MAX_SIZE)
@@ -68,8 +68,8 @@ x_msg_publisher_t::~x_msg_publisher_t(void)
  *      2、(X_NULL == xfunc_notify) 时，工作对象自身的工作线程执行通知操作。
  * </pre>
  *
- * @param [in ] xfunc_notify : 消息投递后的回调操作接口。
- * @param [in ] xht_context  : 通知操作的 上下文描述句柄。
+ * @param [in ] xfunc_notify : 消息投递后的回调通知操作接口。
+ * @param [in ] xht_context  : 通知操作回调的 上下文描述句柄。
  *
  * @return x_int32_t
  *         - 成功，返回 0；
@@ -119,6 +119,11 @@ x_void_t x_msg_publisher_t::stop(void)
     m_xbt_running = X_FALSE;
     if (X_NULL != m_xht_thread)
     {
+        {
+            x_autolock_t xautolock(m_xlock_queue);
+            m_xmq_notify.notify_all();
+        }
+
         std::thread * xthread_ptr = (std::thread *)m_xht_thread;
         if (xthread_ptr->joinable())
             xthread_ptr->join();
@@ -162,7 +167,7 @@ x_int32_t x_msg_publisher_t::msg_dispatch(x_uint32_t xut_max_count /*= 0xFFFFFFF
 
     while (m_xmsg_queue.size() > 0)
     {
-        // 事件通知
+        // 消息分派
         if (msg_dispatch_proc())
         {
             if (++xut_count > xut_max_count)
@@ -195,7 +200,7 @@ x_int32_t x_msg_publisher_t::msg_dispatch(x_uint32_t xut_max_count /*= 0xFFFFFFF
 x_bool_t x_msg_publisher_t::register_subscribe_type(
     x_uint32_t xut_sub_mtype, x_func_dispatch_t xfunc_dispatch)
 {
-    x_autolock_t xautolock(m_xmap_dispfunc);
+    x_autolock_t xautolock(m_xlock_mapfunc);
     x_map_dispfunc_t::iterator itfind = m_xmap_dispfunc.find(xut_sub_mtype);
     if (itfind != m_xmap_dispfunc.end())
     {
@@ -214,7 +219,7 @@ x_bool_t x_msg_publisher_t::register_subscribe_type(
  */
 x_void_t x_msg_publisher_t::unregister_subscribe_type(x_uint32_t xut_sub_mtype)
 {
-    x_autolock_t xautolock(m_xmap_dispfunc);
+    x_autolock_t xautolock(m_xlock_mapfunc);
     m_xmap_dispfunc.erase(xut_sub_mtype);
 }
 
@@ -280,20 +285,14 @@ x_int32_t x_msg_publisher_t::post_msg(x_msgctxt_t * xmsg_ptr)
         return -1;
     }
 
-    // 将异步事件放入投递队列中
-    {
-        x_autolock_t xautolock(m_xmsg_queue);
-        m_xmsg_queue.push(xmsg_ptr);
-    }
-
     // 若消息队列达到上限，则主动丢弃早期投递进来的消息，避免消息队列膨胀
     if (m_xmsg_queue.size() > m_xut_max_qsize)
     {
         xmsg_ptr = X_NULL;
 
-        // 从队列中读取投递的异步事件对象
+        // 从队列中提取要分派的消息对象
         {
-            x_autolock_t xautolock(m_xmsg_queue);
+            x_autolock_t xautolock(m_xlock_queue);
             xmsg_ptr = m_xmsg_queue.front();
             m_xmsg_queue.pop();
         }
@@ -308,8 +307,15 @@ x_int32_t x_msg_publisher_t::post_msg(x_msgctxt_t * xmsg_ptr)
         }
     }
 
+    // 将消息对象放入投递队列中
+    {
+        x_autolock_t xautolock(m_xlock_queue);
+        m_xmsg_queue.push(xmsg_ptr);
+        m_xmq_notify.notify_one();
+    }
+
     // 通知操作
-    if (m_xbt_dispatch && (X_NULL != m_xfunc_notify))
+    if (m_xbt_notify && (X_NULL != m_xfunc_notify))
     {
         m_xfunc_notify(m_xht_context);
     }
@@ -366,7 +372,7 @@ x_int32_t x_msg_publisher_t::post_msg(x_uint32_t  xut_mtype,
 x_void_t x_msg_publisher_t::cleanup(void)
 {
     {
-        x_autolock_t xautolock(m_xmsg_queue);
+        x_autolock_t xautolock(m_xlock_queue);
         while (m_xmsg_queue.size() > 0)
         {
             recyc_msg(m_xmsg_queue.front());
@@ -394,16 +400,28 @@ x_void_t x_msg_publisher_t::thread_dispatch(void)
 
     while (m_xbt_running)
     {
+        // 消息加入队列
+        {
+            std::unique_lock< x_locker_t > xunique_locker(m_xlock_queue);
+            m_xmq_notify.wait(xunique_locker,
+                              [this](void) -> bool
+                              {
+                                  return (!m_xbt_running || (queue_size() > 0));
+                              });
+        }
+
+        if (!m_xbt_running)
+        {
+            break;
+        }
+
+        if (0 == queue_size())
+        {
+            continue;
+        }
+
         // 消息通知
         msg_dispatch_proc();
-
-        // 暂停操作
-        xtime_end = std::chrono::system_clock::now() + std::chrono::milliseconds(50);
-        while (m_xbt_running && (0 == m_xmsg_queue.size()) &&
-               (std::chrono::system_clock::now() < xtime_end))
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
     }
 }
 
@@ -413,18 +431,16 @@ x_void_t x_msg_publisher_t::thread_dispatch(void)
  */
 x_bool_t x_msg_publisher_t::msg_dispatch_proc(void)
 {
-    if (m_xmsg_queue.size() == 0)
-    {
-        return X_FALSE;
-    }
-
     x_msgctxt_t * xmsg_ptr = X_NULL;
 
     // 从队列中读取操作的消息对象
     {
-        x_autolock_t xautolock(m_xmsg_queue);
-        xmsg_ptr = m_xmsg_queue.front();
-        m_xmsg_queue.pop();
+        x_autolock_t xautolock(m_xlock_queue);
+        if (m_xmsg_queue.size() > 0)
+        {
+            xmsg_ptr = m_xmsg_queue.front();
+            m_xmsg_queue.pop();
+        }
     }
 
     if (X_NULL == xmsg_ptr)
@@ -432,21 +448,27 @@ x_bool_t x_msg_publisher_t::msg_dispatch_proc(void)
         return X_FALSE;
     }
 
-    x_bool_t xbt_dispatch = X_FALSE;
+    x_bool_t          xbt_dispatch = X_FALSE;
+    x_func_dispatch_t xfunc_invoke = X_NULL;
 
-    // 分派消息对象
+    // 获取消息分派的接口
     {
-        x_autolock_t xautolock(m_xmap_dispfunc);
+        x_autolock_t xautolock(m_xlock_mapfunc);
         x_map_dispfunc_t::iterator itfind = m_xmap_dispfunc.find(xmsg_ptr->xut_mtype);
         if (itfind != m_xmap_dispfunc.end())
         {
-            itfind->second(xmsg_ptr->xut_msgid,
-                           xmsg_ptr->xht_mctxt,
-                           xmsg_ptr->xut_msize,
-                           xmsg_ptr->xct_mdptr);
-
-            xbt_dispatch = X_TRUE;
+            xfunc_invoke = itfind->second;
         }
+    }
+
+    // 分派消息对象
+    if (X_NULL != xfunc_invoke)
+    {
+        xfunc_invoke(xmsg_ptr->xut_msgid,
+                     xmsg_ptr->xht_mctxt,
+                     xmsg_ptr->xut_msize,
+                     xmsg_ptr->xct_mdptr);
+        xbt_dispatch = X_TRUE;
     }
 
     // 回收消息对象

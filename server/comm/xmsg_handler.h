@@ -78,19 +78,19 @@ public:
 #include "xmsg_subscriber.h"
 
 /**
- * @class x_spec_subscriber_t< _Ty, _Ey >
+ * @class x_spec_subscriber_t< _Ty, _Mt >
  * @brief 消息订阅者的模板类。
  * @note  特化消息分派接口的格式为 func(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)。
  * @param [in ] _Ty : 订阅者的派生类。
- * @param [in ] _Ey : 订阅的事件类型。
+ * @param [in ] _Mt : 订阅的消息类型。
  */
-template< class _Ty, x_uint32_t _Ey >
+template< class _Ty, x_uint32_t _Mt >
 class x_spec_subscriber_t : public x_msg_subscriber_t< _Ty, x_uint32_t, x_uint32_t, x_pvoid_t >
 {
     // common data types
 public:
     using __super_type = x_msg_subscriber_t< _Ty, x_uint32_t, x_uint32_t, x_pvoid_t >;
-    using __obser_type = x_spec_subscriber_t< _Ty, _Ey >;
+    using __obser_type = x_spec_subscriber_t< _Ty, _Mt >;
 
     using x_this_t     = typename __super_type::x_this_t;
     using x_typeid_t   = typename __super_type::x_typeid_t;
@@ -107,7 +107,7 @@ public:
     static x_bool_t register_msg_diapatch(void)
     {
         return x_msg_handler_t::instance().register_subscribe_type(
-                            _Ey, &x_spec_subscriber_t< _Ty, _Ey >::dispatch_entry_ex);
+                            _Mt, &x_spec_subscriber_t< _Ty, _Mt >::dispatch_entry_ex);
     }
 
     /**********************************************************/
@@ -116,7 +116,7 @@ public:
      */
     static x_void_t unregister_msg_diapatch(void)
     {
-        return x_msg_handler_t::instance().unregister_subscribe_type(_Ey);
+        return x_msg_handler_t::instance().unregister_subscribe_type(_Mt);
     }
 
     /**********************************************************/
@@ -144,7 +144,7 @@ public:
     /**
      * @brief 订阅者类型。
      */
-    static inline x_uint32_t stype(void) { return _Ey; }
+    static inline x_uint32_t stype(void) { return _Mt; }
 
 	/**********************************************************/
 	/**
@@ -156,7 +156,7 @@ public:
 	 * @param [out] xpvt_dptr : 消息数据体缓存。
 	 * 
 	 * @return x_handle_t
-	 *         - 成功，返回 事件操作句柄；
+	 *         - 成功，返回 消息对象操作句柄；
 	 *         - 失败，返回 X_NULL。
 	 */
 	static x_handle_t alloc_msg(x_uint32_t  xut_msgid,
@@ -170,7 +170,7 @@ public:
 
         x_msgctxt_t * xmsg_ptr =
             x_msg_handler_t::instance().alloc_msg(
-                _Ey, xut_msgid, reinterpret_cast< x_handle_t >(xst_objid), xut_msize);
+                _Mt, xut_msgid, reinterpret_cast< x_handle_t >(xst_objid), xut_msize);
 
 #ifdef _MSC_VER
 #pragma warning(default : 4312)
@@ -256,11 +256,11 @@ public:
 public:
     /**********************************************************/
     /**
-     * @brief 重置（清理）对象所有通知操作的相关连接。
+     * @brief 重置（清理）对象所有消息分派操作的相关连接。
      */
-    x_void_t reset_notify(void)
+    x_void_t reset_dispatch(void)
     {
-        __super_type::remove_notify(reinterpret_cast< x_this_t >(this));
+        __super_type::remove_dispatch(reinterpret_cast< x_this_t >(this));
         __super_type::clear_mkey_map();
     }
 
@@ -273,7 +273,7 @@ public:
 	 * @param [out] xpvt_dptr : 消息数据体缓存。
 	 * 
 	 * @return x_handle_t
-	 *         - 成功，返回 事件操作句柄；
+	 *         - 成功，返回 消息对象操作句柄；
 	 *         - 失败，返回 X_NULL。
 	 */
 	inline x_handle_t alloc_msg(x_uint32_t xut_msgid, x_uint32_t xut_msize, x_pvoid_t & xpvt_dptr)
@@ -307,7 +307,7 @@ public:
  */
 typedef enum emMsgSubscriberType
 {
-    EM_EST_MASTER    = 0x00000100,    ///< master 事件订阅者对象接收的事件类型
+    EM_EST_MASTER    = 0x00000100,    ///< master 消息订阅者对象接收的消息类型
 } emMsgSubscriberType;
 
 ////////////////////////////////////////////////////////////////////////////////
