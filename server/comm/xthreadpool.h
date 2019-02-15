@@ -11,7 +11,7 @@
  * 当前版本：1.2.0.0
  * 作    者：
  * 完成日期：2019年01月18日
- * 版本摘要：任务对象增加挂起操作功能，解决“某一类任务对象在线程池中可顺序执行”的问题。
+ * 版本摘要：任务对象增加挂起判断接口，解决“某一类任务对象在线程池中可顺序执行”的问题。
  * 
  * 历史版本：1.1.0.0
  * 作    者：
@@ -523,7 +523,7 @@ public:
      */
     struct x_running_checker_t final
     {
-        friend class x_threadpool_t;
+        friend x_threadpool_t;
 
         // constructor/destructor
     private:
