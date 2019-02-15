@@ -31,21 +31,15 @@
 #define __XTHREADPOOL_H__
 
 #include <list>
-#include <chrono>
 #include <functional>
-#include <thread>
-#include <atomic>
 #include <utility>
 #include <type_traits>
 
-#ifndef XTP_USE_CONDITION_VARIABLE
-#define XTP_USE_CONDITION_VARIABLE 1
-#endif // XTP_USE_CONDITION_VARIABLE
-
-#if XTP_USE_CONDITION_VARIABLE
+#include <chrono>
+#include <thread>
+#include <atomic>
 #include <mutex>
 #include <condition_variable>
-#endif // XTP_USE_CONDITION_VARIABLE
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -456,11 +450,7 @@ private:
         std::atomic_flag   m_xspin_flag = ATOMIC_FLAG_INIT;   ///< 旋转标志
     };
 
-#if XTP_USE_CONDITION_VARIABLE
     using x_locker_t = std::mutex;
-#else // !XTP_USE_CONDITION_VARIABLE
-    using x_locker_t = x_spinlock_t;
-#endif // XTP_USE_CONDITION_VARIABLE
 
 public:
     /** 前置声明 */
@@ -861,13 +851,11 @@ public:
         }
         else if (m_lst_threads.size() > 0)
         {
-#if XTP_USE_CONDITION_VARIABLE
             // 通知所有工作线程对象，检测退出事件
             {
                 std::lock_guard< x_locker_t > xautolock_task(m_lock_smt_task);
                 m_thds_notifier.notify_all();
             }
-#endif // XTP_USE_CONDITION_VARIABLE
 
             // 递减工作线程数量
             while (m_lst_threads.size() > xthds)
@@ -893,9 +881,7 @@ public:
             m_lst_smt_tasks.push_back(xtask_ptr);
             m_task_count.fetch_add(1);
 
-#if XTP_USE_CONDITION_VARIABLE
             m_thds_notifier.notify_one();
-#endif // XTP_USE_CONDITION_VARIABLE
 
             m_lock_smt_task.unlock();
         }
@@ -1080,7 +1066,6 @@ private:
         {
             if (get_lst_task_size() <= 0)
             {
-#if XTP_USE_CONDITION_VARIABLE
                 std::unique_lock< x_locker_t > xunique_locker(m_lock_smt_task);
                 m_thds_notifier.wait(xunique_locker,
                                      [this, &xht_checker](void) -> bool
@@ -1088,10 +1073,6 @@ private:
                                          return ((get_lst_task_size() > 0) ||
                                                  (!xht_checker.is_enable_running()));
                                      });
-#else // !XTP_USE_CONDITION_VARIABLE
-                thread_yield(xcounter);
-                continue;
-#endif // XTP_USE_CONDITION_VARIABLE
             }
 
             if (!xht_checker.is_enable_running())
@@ -1142,14 +1123,14 @@ private:
     volatile size_t            m_xthds_capacity;  ///< 工作线程对象的上限数量
     std::list< std::thread >   m_lst_threads;     ///< 工作线程对象的队列
 
-#if XTP_USE_CONDITION_VARIABLE
     std::condition_variable    m_thds_notifier;   ///< 工作线程对象的通知器（条件变量）
-#endif // XTP_USE_CONDITION_VARIABLE
 
     x_locker_t                 m_lock_smt_task;   ///< 用于提交操作的任务队列的同步操作锁
     std::list< x_task_ptr_t >  m_lst_smt_tasks;   ///< 用于提交操作的任务队列
+
     x_locker_t                 m_lock_run_task;   ///< 待执行的任务队列的同步操作锁
     std::list< x_task_ptr_t >  m_lst_run_tasks;   ///< 待执行的任务队列
+
     volatile bool              m_enable_get_task; ///< 标识当前是否可提取待执行的任务对象
     std::atomic< size_t >      m_task_count;      ///< 任务对象计数器
 };
