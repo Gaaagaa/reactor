@@ -36,13 +36,21 @@
 
 #endif // _MSC_VER
 
-#ifndef XASSERT
+#ifndef ENABLE_XASSERT
 #if ((defined _DEBUG) || (defined DEBUG))
-#include <cassert>
-#define XASSERT(xptr)    assert((xptr))
+#define ENABLE_XASSERT 1
 #else // !((defined _DEBUG) || (defined DEBUG))
-#define XASSERT(xptr)
+#define ENABLE_XASSERT 0
 #endif // ((defined _DEBUG) || (defined DEBUG))
+#endif // ENABLE_XASSERT
+
+#ifndef XASSERT
+#if ENABLE_XASSERT
+#include <cassert>
+#define XASSERT(xptr)    assert(xptr)
+#else // !ENABLE_XASSERT
+#define XASSERT(xptr)
+#endif // ENABLE_XASSERT
 #endif // XASSERT
 
 #ifndef ENABLE_MAPTBL_VALID
