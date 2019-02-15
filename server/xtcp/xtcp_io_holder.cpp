@@ -561,41 +561,29 @@ x_int32_t x_tcp_io_task_t::handle_msgpump(void)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// x_tcp_io_holder_t
+// x_tcp_io_creator_t
 
 //====================================================================
 
 // 
-// x_tcp_io_holder_t : constructor/destructor
+// x_tcp_io_creator_t : constructor/destructor
 // 
 
-x_tcp_io_holder_t::x_tcp_io_holder_t(void)
+x_tcp_io_creator_t::x_tcp_io_creator_t(void)
     : m_xio_csptr(nullptr)
 {
 
 }
 
-x_tcp_io_holder_t::~x_tcp_io_holder_t(void)
+x_tcp_io_creator_t::~x_tcp_io_creator_t(void)
 {
-    if (nullptr != m_xio_csptr)
-    {
-        x_tcp_io_manager_t * xmanager_ptr =
-                    (x_tcp_io_manager_t *)m_xio_csptr->get_manager();
-        if (nullptr != xmanager_ptr)
-        {
-            xmanager_ptr->submit_io_task(
-                x_io_task_t::taskpool().alloc(
-                    x_io_cwptr_t(m_xio_csptr), x_io_task_t::EIO_TASK_DESTROY));
-        }
 
-        m_xio_csptr.reset();
-    }
 }
 
 //====================================================================
 
 // 
-// x_tcp_io_holder_t : public interfaces
+// x_tcp_io_creator_t : overrides
 // 
 
 /**********************************************************/
@@ -609,10 +597,9 @@ x_tcp_io_holder_t::~x_tcp_io_holder_t(void)
  *         - 成功，返回 0；
  *         - 失败，返回 错误码。
  */
-x_int32_t x_tcp_io_holder_t::io_reading(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
+x_int32_t x_tcp_io_creator_t::io_reading(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
 {
     x_int32_t  xit_error   = -1;
-    x_bool_t   xbt_created = X_FALSE;
 
     x_tcp_io_manager_t * xmanager_ptr = (x_tcp_io_manager_t *)xht_manager;
 
@@ -624,23 +611,20 @@ x_int32_t x_tcp_io_holder_t::io_reading(x_handle_t xht_manager, x_sockfd_t xfdt_
         {
             break;
         }
+
+        XASSERT(nullptr == m_xio_csptr);
 
         //======================================
         // 尝试创建业务层工作对象
 
-        if (nullptr == m_xio_csptr)
+        xit_error = try_create_io_channel(xht_manager, xfdt_sockfd);
+        if (0 != xit_error)
         {
-            xit_error = try_create_io_handle(xht_manager, xfdt_sockfd);
-            if (0 != xit_error)
-            {
-                LOGE("try_create_io_handle(xht_manager, xfdt_sockfd[%s:%d]) return error : %d",
-                     sockfd_remote_ip(xfdt_sockfd, LOG_BUF(64), 64),
-                     sockfd_remote_port(xfdt_sockfd),
-                     xit_error);
-                break;
-            }
-
-            xbt_created = (nullptr != m_xio_csptr);
+            LOGE("try_create_io_channel(xht_manager, xfdt_sockfd[%s:%d]) return error : %d",
+                    sockfd_remote_ip(xfdt_sockfd, LOG_BUF(64), 64),
+                    sockfd_remote_port(xfdt_sockfd),
+                    xit_error);
+            break;
         }
 
         if (nullptr == m_xio_csptr)
@@ -649,115 +633,28 @@ x_int32_t x_tcp_io_holder_t::io_reading(x_handle_t xht_manager, x_sockfd_t xfdt_
         }
 
         //======================================
-        // 提交 “业务层的 IO 读事件” 的业务处理任务
-
-        if (xbt_created)
-        {
-            xmanager_ptr->submit_io_task(
-                x_io_task_t::taskpool().alloc(
-                    x_io_cwptr_t(m_xio_csptr), x_io_task_t::EIO_TASK_CREATED));
-        }
-        else
-        {
-#if 1
-            xmanager_ptr->submit_io_task(
-                x_io_task_t::taskpool().alloc(
-                    x_io_cwptr_t(m_xio_csptr), x_io_task_t::EIO_TASK_READING));
-#else
-            m_xmsg_swap.reset(0, 0);
-            m_xmsg_swap.nio_read (xfdt_sockfd, ECV_NIO_MAX_LEN, xit_error);
-            m_xmsg_swap.nio_write(xfdt_sockfd, ECV_NIO_MAX_LEN, xit_error);
-
-            xit_error = 0;
-#endif
-        }
-
-        //======================================
-        xit_error = 0;
-    } while (0);
-
-    return xit_error;
-}
-
-/**********************************************************/
-/**
- * @brief 处理 写操作 事件。
- * 
- * @param [in ] xht_manager : IO 管理对象（x_tcp_io_manager_t）。
- * @param [in ] xfdt_sockfd : 目标操作的套接字描述符。
- * 
- * @return x_int32_t
- *         - 成功，返回 0；
- *         - 失败，返回 错误码。
- */
-x_int32_t x_tcp_io_holder_t::io_writing(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
-{
-    x_int32_t  xit_error = -1;
- 
-    x_tcp_io_manager_t * xmanager_ptr = (x_tcp_io_manager_t *)xht_manager;
-
-    do
-    {
-        //======================================
-
-        if ((X_NULL == xht_manager) || (X_INVALID_SOCKFD == xfdt_sockfd))
-        {
-            break;
-        }
-
-        if (nullptr == m_xio_csptr)
-        {
-            xit_error = 0;
-            break;
-        }
-
-        XASSERT(xfdt_sockfd == m_xio_csptr->get_sockfd());
-
-        //======================================
-        // 提交 “业务层的 IO 写事件” 的业务处理任务
+        // 提交 “业务层的 IO 初建事件” 的业务处理任务
 
         xmanager_ptr->submit_io_task(
             x_io_task_t::taskpool().alloc(
-                x_io_cwptr_t(m_xio_csptr), x_io_task_t::EIO_TASK_WRITING));
+                x_io_cwptr_t(m_xio_csptr), x_io_task_t::EIO_TASK_CREATED));
 
         //======================================
         xit_error = 0;
     } while (0);
 
     return xit_error;
-}
-
-/**********************************************************/
-/**
- * @brief 处理 巡检 事件。
- * 
- * @param [in ] xht_manager : IO 管理对象（x_tcp_io_manager_t）。
- * @param [in ] xfdt_sockfd : 目标操作的套接字描述符。
- * 
- * @return x_int32_t
- *         - 成功，返回 0；
- *         - 失败，返回 错误码。
- */
-x_int32_t x_tcp_io_holder_t::io_verify(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
-{
-    if (nullptr != m_xio_csptr)
-    {
-        return m_xio_csptr->io_event_runtime_verify();
-    }
-
-    return 0;
 }
 
 //====================================================================
 
 // 
-// x_tcp_io_holder_t : internal invoking
+// x_tcp_io_creator_t : internal invoking
 // 
 
 /**********************************************************/
 /**
  * @brief 尝试接收首个 IO 消息，创建业务层中对应的 x_tcp_io_channel_t 对象。
- * @note  该接口只为 io_reading() 调用。
  * 
  * @param [in ] xht_manager : IO 管理对象（x_tcp_io_manager_t）。
  * @param [in ] xfdt_sockfd : 目标操作的套接字描述符。
@@ -766,7 +663,7 @@ x_int32_t x_tcp_io_holder_t::io_verify(x_handle_t xht_manager, x_sockfd_t xfdt_s
  *         - 成功，返回 0；
  *         - 失败，返回 错误码。
  */
-x_int32_t x_tcp_io_holder_t::try_create_io_handle(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
+x_int32_t x_tcp_io_creator_t::try_create_io_channel(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
 {
     x_int32_t  xit_error = -1;
     x_uint32_t xut_count = 0;
@@ -852,3 +749,149 @@ x_int32_t x_tcp_io_holder_t::try_create_io_handle(x_handle_t xht_manager, x_sock
 
     return xit_error;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// x_tcp_io_holder_t
+
+//====================================================================
+
+// 
+// x_tcp_io_holder_t : constructor/destructor
+// 
+
+x_tcp_io_holder_t::x_tcp_io_holder_t(const x_io_csptr_t & xio_csptr)
+    : m_xio_csptr(xio_csptr)
+{
+
+}
+
+x_tcp_io_holder_t::~x_tcp_io_holder_t(void)
+{
+    if (nullptr != m_xio_csptr)
+    {
+        x_tcp_io_manager_t * xmanager_ptr =
+                    (x_tcp_io_manager_t *)m_xio_csptr->get_manager();
+        if (nullptr != xmanager_ptr)
+        {
+            xmanager_ptr->submit_io_task(
+                x_io_task_t::taskpool().alloc(
+                    x_io_cwptr_t(m_xio_csptr), x_io_task_t::EIO_TASK_DESTROY));
+        }
+
+        m_xio_csptr.reset();
+    }
+}
+
+//====================================================================
+
+// 
+// x_tcp_io_holder_t : overrides
+// 
+
+/**********************************************************/
+/**
+ * @brief 处理 读操作 事件。
+ * 
+ * @param [in ] xht_manager : IO 管理对象（x_tcp_io_manager_t）。
+ * @param [in ] xfdt_sockfd : 目标操作的套接字描述符。
+ * 
+ * @return x_int32_t
+ *         - 成功，返回 0；
+ *         - 失败，返回 错误码。
+ */
+x_int32_t x_tcp_io_holder_t::io_reading(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
+{
+    x_int32_t  xit_error = -1;
+ 
+    x_tcp_io_manager_t * xmanager_ptr = (x_tcp_io_manager_t *)xht_manager;
+
+    do
+    {
+        //======================================
+
+        if ((X_NULL == xht_manager) || (X_INVALID_SOCKFD == xfdt_sockfd))
+        {
+            break;
+        }
+
+        XASSERT(nullptr != m_xio_csptr);
+        XASSERT(xfdt_sockfd == m_xio_csptr->get_sockfd());
+
+        //======================================
+        // 提交 “业务层的 IO 读事件” 的业务处理任务
+
+        xmanager_ptr->submit_io_task(
+            x_io_task_t::taskpool().alloc(
+                x_io_cwptr_t(m_xio_csptr), x_io_task_t::EIO_TASK_READING));
+
+        //======================================
+        xit_error = 0;
+    } while (0);
+
+    return xit_error;
+}
+
+/**********************************************************/
+/**
+ * @brief 处理 写操作 事件。
+ * 
+ * @param [in ] xht_manager : IO 管理对象（x_tcp_io_manager_t）。
+ * @param [in ] xfdt_sockfd : 目标操作的套接字描述符。
+ * 
+ * @return x_int32_t
+ *         - 成功，返回 0；
+ *         - 失败，返回 错误码。
+ */
+x_int32_t x_tcp_io_holder_t::io_writing(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
+{
+    x_int32_t  xit_error = -1;
+ 
+    x_tcp_io_manager_t * xmanager_ptr = (x_tcp_io_manager_t *)xht_manager;
+
+    do
+    {
+        //======================================
+
+        if ((X_NULL == xht_manager) || (X_INVALID_SOCKFD == xfdt_sockfd))
+        {
+            break;
+        }
+
+        XASSERT(nullptr != m_xio_csptr);
+        XASSERT(xfdt_sockfd == m_xio_csptr->get_sockfd());
+
+        //======================================
+        // 提交 “业务层的 IO 写事件” 的业务处理任务
+
+        xmanager_ptr->submit_io_task(
+            x_io_task_t::taskpool().alloc(
+                x_io_cwptr_t(m_xio_csptr), x_io_task_t::EIO_TASK_WRITING));
+
+        //======================================
+        xit_error = 0;
+    } while (0);
+
+    return xit_error;
+}
+
+/**********************************************************/
+/**
+ * @brief 处理 巡检 事件。
+ * 
+ * @param [in ] xht_manager : IO 管理对象（x_tcp_io_manager_t）。
+ * @param [in ] xfdt_sockfd : 目标操作的套接字描述符。
+ * 
+ * @return x_int32_t
+ *         - 成功，返回 0；
+ *         - 失败，返回 错误码。
+ */
+x_int32_t x_tcp_io_holder_t::io_verify(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
+{
+    if (nullptr != m_xio_csptr)
+    {
+        return m_xio_csptr->io_event_runtime_verify();
+    }
+
+    return 0;
+}
+

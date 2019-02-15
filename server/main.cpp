@@ -22,18 +22,21 @@
 
 #include "xcomm.h"
 #include "xmaster.h"
+#include "xftp_server.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char * argv[])
 {
-    x_int32_t xit_exitcode = x_master_t::instance().startup(argc, argv);
-    if (0 == xit_exitcode)
-    {
-        xit_exitcode = x_master_t::instance().run();
-    }
+    x_int32_t  xit_error = -1;
+    x_master_t & xmaster = x_master_t::instance();
 
-    x_master_t::instance().shutdown();
+    xmaster.set_init_callback(&x_ftp_server_t::init_extra_callback, X_NULL);
 
-    return xit_exitcode;
+    xit_error = xmaster.startup(argc, argv);
+    if (0 == xit_error)
+        xit_error = xmaster.run();
+    xmaster.shutdown();
+
+    return xit_error;
 }

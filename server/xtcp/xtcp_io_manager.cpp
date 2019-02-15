@@ -157,7 +157,7 @@ x_int32_t x_tcp_io_manager_t::update_io_kpalive(x_sockfd_t xfdt_sockfd, x_handle
 
 /**********************************************************/
 /**
- * @brief 返回当前管理的 IO句柄对象(x_tcp_io_holder_t)。
+ * @brief 返回当前管理的 IO 句柄对象(x_tcp_io_handler_t)。
  */
 x_uint32_t x_tcp_io_manager_t::count(void) const
 {
@@ -211,8 +211,8 @@ x_int32_t x_tcp_io_manager_t::create_io_channel(x_tcp_io_create_args_t & xio_cre
  */
 x_int32_t x_tcp_io_manager_t::io_event_accept(x_sockfd_t xfdt_sockfd)
 {
-    x_int32_t  xit_error  = -1;
-    x_handle_t xht_holder = X_NULL;
+    x_int32_t  xit_error   = -1;
+    x_handle_t xht_handler = X_NULL;
 
     do 
     {
@@ -220,7 +220,7 @@ x_int32_t x_tcp_io_manager_t::io_event_accept(x_sockfd_t xfdt_sockfd)
         // 进行锁测试，若成功，则表示映射表中已经存在
         // 对应套接字映射节点，这情况不应该发生
 
-        xit_error = maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, &xht_holder, MAPTBL_TIMEOUT_INFINIT);
+        xit_error = maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, &xht_handler, MAPTBL_TIMEOUT_INFINIT);
         if (MAPTBL_ERR_SUCCESS == xit_error)
         {
             LOGE("maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd[%d], ...) OK，xfdt_sockfd already exists in the map table!",
@@ -246,24 +246,26 @@ x_int32_t x_tcp_io_manager_t::io_event_accept(x_sockfd_t xfdt_sockfd)
         }
 
         //======================================
-        // 新增 x_tcp_io_holder_t 对象，并加入到映射表中
+        // 新增 x_tcp_io_creator_t 对象，并加入到映射表中
+        // 等待完成 x_tcp_io_channel_t 对象的创建后，
+        // 再将映射对象改成 x_tcp_io_holder_t 对象
 
-        xht_holder = (x_handle_t)(new x_tcp_io_holder_t());
-        if (X_NULL == xht_holder)
+        xht_handler = (x_handle_t)(new x_tcp_io_creator_t());
+        if (X_NULL == xht_handler)
         {
-            LOGE("(x_handle_t)(new x_tcp_io_holder_t()) return X_NULL");
+            LOGE("(x_handle_t)(new x_tcp_io_creator_t()) return X_NULL");
             xit_error = -1;
             XASSERT(X_FALSE);
             break;
         }
 
-        xit_error = maptbl_insert(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, xht_holder, MAPTBL_TIMEOUT_INFINIT);
+        xit_error = maptbl_insert(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, xht_handler, MAPTBL_TIMEOUT_INFINIT);
         if (MAPTBL_ERR_SUCCESS != xit_error)
         {
             LOGE("maptbl_insert(m_xht_mapsockfd, (x_size_t)xfdt_sockfd[%d], ...) return error : %d",
                  xfdt_sockfd, xit_error);
-            delete (x_tcp_io_holder_t *)xht_holder;
-            xht_holder = X_NULL;
+            delete (x_tcp_io_handler_t *)xht_handler;
+            xht_handler = X_NULL;
             break;
         }
 
@@ -286,14 +288,14 @@ x_int32_t x_tcp_io_manager_t::io_event_accept(x_sockfd_t xfdt_sockfd)
  */
 x_int32_t x_tcp_io_manager_t::io_event_close(x_sockfd_t xfdt_sockfd)
 {
-    x_int32_t  xit_error  = -1;
-    x_handle_t xht_holder = X_NULL;
+    x_int32_t  xit_error   = -1;
+    x_handle_t xht_handler = X_NULL;
 
     //======================================
 
     do
     {
-        xit_error = maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, &xht_holder, MAPTBL_TIMEOUT_INFINIT);
+        xit_error = maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, &xht_handler, MAPTBL_TIMEOUT_INFINIT);
         if (MAPTBL_ERR_SUCCESS != xit_error)
         {
             LOGE("maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd[%d], ...) return error : %d",
@@ -301,10 +303,10 @@ x_int32_t x_tcp_io_manager_t::io_event_close(x_sockfd_t xfdt_sockfd)
             break;
         }
 
-        if (X_NULL != xht_holder)
+        if (X_NULL != xht_handler)
         {
-            delete (x_tcp_io_holder_t *)xht_holder;
-            xht_holder = X_NULL;
+            delete (x_tcp_io_handler_t *)xht_handler;
+            xht_handler = X_NULL;
         }
 
         maptbl_delete(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, 0);
@@ -328,14 +330,19 @@ x_int32_t x_tcp_io_manager_t::io_event_close(x_sockfd_t xfdt_sockfd)
  */
 x_int32_t x_tcp_io_manager_t::io_event_read(x_sockfd_t xfdt_sockfd)
 {
-    x_int32_t  xit_error  = -1;
-    x_handle_t xht_holder = X_NULL;
+    x_int32_t  xit_error   = -1;
+    x_handle_t xht_handler = X_NULL;
+
+    x_tcp_io_handler_t * xio_handler = X_NULL;
+    x_tcp_io_creator_t * xio_creator = X_NULL;
 
     //======================================
 
+    x_bool_t xbt_lock = X_FALSE;
+
     do
     {
-        xit_error = maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, &xht_holder, MAPTBL_TIMEOUT_INFINIT);
+        xit_error = maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, &xht_handler, MAPTBL_TIMEOUT_INFINIT);
         if (MAPTBL_ERR_SUCCESS != xit_error)
         {
             LOGE("maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd[%d], ...) return error : %d",
@@ -343,18 +350,77 @@ x_int32_t x_tcp_io_manager_t::io_event_read(x_sockfd_t xfdt_sockfd)
             break;
         }
 
-        if (X_NULL != xht_holder)
+        xbt_lock = X_TRUE;
+
+        if (X_NULL == xht_handler)
         {
-            xit_error = ((x_tcp_io_holder_t *)xht_holder)->io_reading((x_handle_t)this, xfdt_sockfd);
-            if (0 != xit_error)
-            {
-                LOGE("((x_tcp_io_holder_t *)xht_holder)->io_reading((x_handle_t)this, xfdt_sockfd[%d]) return error : %d",
-                     xfdt_sockfd, xit_error);
-            }
+            LOGW("(X_NULL == xht_handler) xfdt_sockfd : %d", xfdt_sockfd);
+            xit_error = -1;
+            break;
         }
 
-        maptbl_unlock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd);
+        xio_handler = (x_tcp_io_handler_t *)xht_handler;
+
+        //======================================
+        // x_tcp_io_holder_t 对象的 io_reading() 处理流程
+
+        // 已经创建了 x_tcp_io_channnel_t 对象，
+        // 则进行 读事件 的投递操作
+        if (x_tcp_io_handler_t::EIO_HTYPE_HOLDER == xio_handler->htype())
+        {
+            xit_error = xio_handler->io_reading((x_handle_t)this, xfdt_sockfd);
+            if (0 != xit_error)
+            {
+                LOGE("xio_handler->io_reading(..., xfdt_sockfd[%d]) return error : %d",
+                        xfdt_sockfd, xit_error);
+            }
+
+            break;
+        }
+
+        //======================================
+        // x_tcp_io_creator_t 对象的 io_reading() 处理流程
+        // 未创建 x_tcp_io_channnel_t 对象，则尝试 创建操作
+
+        if (x_tcp_io_handler_t::EIO_HTYPE_CREATOR != xio_handler->htype())
+        {
+            LOGW("x_tcp_io_handler_t::EIO_HTYPE_CREATOR[%d] != xio_handler->htype()[%d]",
+                 x_tcp_io_handler_t::EIO_HTYPE_CREATOR, xio_handler->htype());
+            xit_error = -1;
+            break;
+        }
+
+        xio_creator = (x_tcp_io_creator_t *)xht_handler;
+        xit_error = xio_creator->io_reading((x_handle_t)this, xfdt_sockfd);
+        if (0 != xit_error)
+        {
+            LOGE("xio_creator->io_reading(..., xfdt_sockfd[%d]) return error : %d",
+                 xfdt_sockfd, xit_error);
+            break;
+        }
+
+        // 若成功创建了业务层的 x_tcp_io_channel_t 对象，
+        // 则将新建的对象更新至映射表中，之后删除 xio_creator 对象
+        if (nullptr != xio_creator->get_io_channel())
+        {
+            xht_handler = (x_handle_t)(new x_tcp_io_holder_t(xio_creator->get_io_channel()));
+            XASSERT(X_NULL != xht_handler);
+
+            XVERIFY(MAPTBL_ERR_SUCCESS ==
+                maptbl_update(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, xht_handler, 0));
+
+            delete xio_creator;
+            xio_creator = X_NULL;
+        }
+
+        //======================================
+        xit_error = 0;
     } while (0);
+
+    if (xbt_lock)
+    {
+        maptbl_unlock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd);
+    }
 
     //======================================
 
@@ -373,14 +439,14 @@ x_int32_t x_tcp_io_manager_t::io_event_read(x_sockfd_t xfdt_sockfd)
  */
 x_int32_t x_tcp_io_manager_t::io_event_write(x_sockfd_t xfdt_sockfd)
 {
-    x_int32_t  xit_error    = -1;
-    x_handle_t xht_holder = X_NULL;
+    x_int32_t  xit_error   = -1;
+    x_handle_t xht_handler = X_NULL;
 
     //======================================
 
     do
     {
-        xit_error = maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, &xht_holder, MAPTBL_TIMEOUT_INFINIT);
+        xit_error = maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, &xht_handler, MAPTBL_TIMEOUT_INFINIT);
         if (MAPTBL_ERR_SUCCESS != xit_error)
         {
             LOGE("maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd[%d], ...) return error : %d",
@@ -388,12 +454,12 @@ x_int32_t x_tcp_io_manager_t::io_event_write(x_sockfd_t xfdt_sockfd)
             break;
         }
 
-        if (X_NULL != xht_holder)
+        if (X_NULL != xht_handler)
         {
-            xit_error = ((x_tcp_io_holder_t *)xht_holder)->io_writing((x_handle_t)this, xfdt_sockfd);
+            xit_error = ((x_tcp_io_handler_t *)xht_handler)->io_writing((x_handle_t)this, xfdt_sockfd);
             if (0 != xit_error)
             {
-                LOGE("((x_tcp_io_holder_t *)xht_holder)->io_writing((x_handle_t)this, xfdt_sockfd[%d]) return error : %d",
+                LOGE("xht_handler->io_writing((x_handle_t)this, xfdt_sockfd[%d]) return error : %d",
                      xfdt_sockfd, xit_error);
             }
         }
@@ -418,14 +484,14 @@ x_int32_t x_tcp_io_manager_t::io_event_write(x_sockfd_t xfdt_sockfd)
  */
 x_int32_t x_tcp_io_manager_t::io_event_verify(x_sockfd_t xfdt_sockfd)
 {
-    x_int32_t  xit_error    = -1;
-    x_handle_t xht_holder = X_NULL;
+    x_int32_t  xit_error   = -1;
+    x_handle_t xht_handler = X_NULL;
 
     //======================================
 
     do
     {
-        xit_error = maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, &xht_holder, MAPTBL_TIMEOUT_INFINIT);
+        xit_error = maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, &xht_handler, MAPTBL_TIMEOUT_INFINIT);
         if (MAPTBL_ERR_SUCCESS != xit_error)
         {
             LOGE("maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd[%d], ...) return error : %d",
@@ -433,13 +499,13 @@ x_int32_t x_tcp_io_manager_t::io_event_verify(x_sockfd_t xfdt_sockfd)
             break;
         }
 
-        if (X_NULL != xht_holder)
+        if (X_NULL != xht_handler)
         {
-            xit_error = ((x_tcp_io_holder_t *)xht_holder)->io_verify((x_handle_t)this, xfdt_sockfd);
+            xit_error = ((x_tcp_io_handler_t *)xht_handler)->io_verify((x_handle_t)this, xfdt_sockfd);
             if (0 != xit_error)
             {
-                LOGE("xht_holder->io_verify((x_handle_t)this, xfdt_sockfd[%d]) return error : %d",
-                    xfdt_sockfd, xit_error);
+                LOGE("xht_handler->io_verify((x_handle_t)this, xfdt_sockfd[%d]) return error : %d",
+                     xfdt_sockfd, xit_error);
             }
         }
 
@@ -471,11 +537,11 @@ x_int32_t x_tcp_io_manager_t::io_event_verify(x_sockfd_t xfdt_sockfd)
  */
 x_bool_t x_tcp_io_manager_t::mapsockfd_cleanup(x_handle_t xht_maptbl, x_sockfd_t xfdt_sockfd, x_handle_t * xht_handler)
 {
-    x_tcp_io_holder_t * xio_holder_ptr = (x_tcp_io_holder_t *)(*xht_handler);
-    if (X_NULL != xio_holder_ptr)
+    x_tcp_io_handler_t * xio_handler = (x_tcp_io_handler_t *)(*xht_handler);
+    if (X_NULL != xio_handler)
     {
-        delete xio_holder_ptr;
-        xio_holder_ptr = X_NULL;
+        delete xio_handler;
+        xio_handler = X_NULL;
         *xht_handler = X_NULL;
     }
 
@@ -486,7 +552,7 @@ x_bool_t x_tcp_io_manager_t::mapsockfd_cleanup(x_handle_t xht_maptbl, x_sockfd_t
 
 /**********************************************************/
 /**
- * @brief 强制清理掉所有的 IO句柄对象(x_tcp_io_holder_t)。
+ * @brief 强制清理掉所有的 IO句柄对象(x_tcp_io_handler_t)。
  */
 x_void_t x_tcp_io_manager_t::cleanup(void)
 {

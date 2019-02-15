@@ -25,7 +25,9 @@
 
 #include "xftp_server.h"
 #include "xftp_msgctxt.h"
+
 #include "xftp_echo.h"
+#include "xftp_query.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // x_ftp_server_t
@@ -35,6 +37,54 @@
 // 
 // x_ftp_server_t : common invoking
 // 
+
+using x_workconf_t = x_tcp_io_server_t::x_workconf_t;
+
+/** 全局的工作配置参数 */
+static x_workconf_t _S_xwct_config;
+
+/** 用于监听操作的套接字 */
+static x_sockfd_t _S_xfdt_listen = X_INVALID_SOCKFD;
+
+/**********************************************************/
+/**
+ * @brief x_master_t 在基本组件初始化完成后，额外进行数据初始化操作所使用的回调接口。
+ * 
+ * @param [in ] xht_context : 回调的上下文句柄。
+ * 
+ * @return x_int32_t
+ *         - 成功，返回 0；
+ *         - 失败，返回 错误码。
+ */
+x_int32_t x_ftp_server_t::init_extra_callback(x_handle_t xht_context)
+{
+    //======================================
+    // 读取相关配置参数
+
+    x_config_t & xconfig = x_config_t::instance();
+
+    xconfig.read_str("server", "host", _S_xwct_config.xszt_host, TEXT_LEN_64, "");
+    _S_xwct_config.xut_port             = xconfig.read_int("server", "port"            , 10086);
+    _S_xwct_config.xut_epoll_maxsockfds = xconfig.read_int("server", "epoll_maxsockfds", 4096 );
+    _S_xwct_config.xut_epoll_waitevents = xconfig.read_int("server", "epoll_waitevents", 256  );
+    _S_xwct_config.xut_ioman_threads    = xconfig.read_int("server", "ioman_threads"   , 4    );
+    _S_xwct_config.xut_tmout_kpalive    = xconfig.read_int("server", "tmout_kpalive"   , 8 * 60 * 1000);
+    _S_xwct_config.xut_tmout_baleful    = xconfig.read_int("server", "tmout_baleful"   , 4 * 60 * 1000);
+    _S_xwct_config.xut_tmout_mverify    = xconfig.read_int("server", "tmout_mverify"   , 4 * 60 * 1000);
+
+    //======================================
+    // 创建程序用于监听操作的套接字
+
+    _S_xfdt_listen = create_and_bind_sockfd(_S_xwct_config.xszt_host, _S_xwct_config.xut_port);
+    if (X_INVALID_SOCKFD == _S_xfdt_listen)
+    {
+        return ((0 == errno) ? -1 : errno);
+    }
+
+    //======================================
+
+    return 0;
+}
 
 /**********************************************************/
 /**
@@ -114,30 +164,17 @@ x_int32_t x_ftp_server_t::startup(void)
 #define REGISTER_IOTYPE(name)   XVERIFY(register_iotype(name::ECV_CONNECTION_TYPE, &name::create))
 
         REGISTER_IOTYPE(x_ftp_echo_t);
+        REGISTER_IOTYPE(x_ftp_query_t);
 
 #undef  REGISTER_IOTYPE
 
         //======================================
-        // 读取相关配置参数
 
-        x_config_t & xconfig = x_config_t::instance();
-
-        x_tcp_io_server_t::x_work_param_t xwpt_config;
-        xconfig.read_str("server", "host", xwpt_config.xszt_host, TEXT_LEN_64, "");
-        xwpt_config.xut_port             = xconfig.read_int("server", "port"            , 10086);
-        xwpt_config.xut_epoll_maxsockfds = xconfig.read_int("server", "epoll_maxsockfds", 4096 );
-        xwpt_config.xut_epoll_waitevents = xconfig.read_int("server", "epoll_waitevents", 256  );
-        xwpt_config.xut_ioman_threads    = xconfig.read_int("server", "ioman_threads"   , 4    );
-        xwpt_config.xut_tmout_kpalive    = xconfig.read_int("server", "tmout_kpalive"   , 8 * 60 * 1000);
-        xwpt_config.xut_tmout_baleful    = xconfig.read_int("server", "tmout_baleful"   , 4 * 60 * 1000);
-        xwpt_config.xut_tmout_mverify    = xconfig.read_int("server", "tmout_mverify"   , 4 * 60 * 1000);
-
-        //======================================
-
-        xit_error = x_tcp_io_server_t::startup(xwpt_config, X_NULL);
+        xit_error = x_tcp_io_server_t::startup(_S_xwct_config, _S_xfdt_listen);
         if (0 != xit_error)
         {
-            LOGE("x_tcp_io_server_t::startup(xwpt_config, X_NULL) return error : %d", xit_error);
+            LOGE("x_tcp_io_server_t::startup(_S_xwct_config, _S_xfdt_listen[%d]) return error : %d",
+                 _S_xfdt_listen, xit_error);
             break;
         }
 

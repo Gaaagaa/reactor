@@ -35,15 +35,15 @@
  */
 class x_tcp_io_server_t
 {
-    friend class x_tcp_io_manager_t;
+    friend x_tcp_io_manager_t;
 
     // common data types
 public:
     /**
-     * @struct x_work_param_t
+     * @struct x_workconf_t
      * @brief  x_tcp_io_server_t 对象的工作配置参数。
      */
-    typedef struct x_work_param_t
+    typedef struct x_workconf_t
     {
         x_char_t    xszt_host[TEXT_LEN_64];   ///< 监听的地址（四段式 IP 地址，为 空 时，将使用 INADDR_ANY）
         x_uint16_t  xut_port;                 ///< 监听的端口号
@@ -54,18 +54,18 @@ public:
         x_uint32_t  xut_tmout_baleful;        ///< 检测恶意连接的超时时间（单位 毫秒）
         x_uint32_t  xut_tmout_mverify;        ///< 定时巡检的超时时间（单位 毫秒）
 
-        x_work_param_t(void)
+        x_workconf_t(void)
         {
-            memset(this, 0, sizeof(x_work_param_t));
+            memset(this, 0, sizeof(x_workconf_t));
         }
 
-        x_work_param_t & operator = (const x_work_param_t & xobject)
+        x_workconf_t & operator = (const x_workconf_t & xobject)
         {
             if (this != &xobject)
-                memcpy(this, &xobject, sizeof(x_work_param_t));
+                memcpy(this, &xobject, sizeof(x_workconf_t));
             return *this;
         }
-    } x_work_param_t;
+    } x_workconf_t;
 
     /**
      * @enum  emConstValue
@@ -86,6 +86,20 @@ private:
     using x_manager_t     = x_tcp_io_manager_t     ;
 
     // common invoking
+public:
+    /**********************************************************/
+    /**
+     * @brief 创建绑定指定端口号 的 TCP套接字。
+     * 
+     * @param [in ] xszt_host : 指定的地址（四段式 IP 地址，为 X_NULL 时，将使用 INADDR_ANY）。
+     * @param [in ] xwt_port  : 指定的端口号。
+     * 
+     * @return x_sockfd_t
+     *         - 成功，返回 套接字的文件描述符；
+     *         - 失败，返回 X_INVALID_SOCKFD。
+     */
+    static x_sockfd_t create_and_bind_sockfd(x_cstring_t xszt_host, x_uint16_t xwt_port);
+
 private:
     /**********************************************************/
     /**
@@ -114,14 +128,14 @@ public:
     /**
      * @brief 启动 TCP 网络服务工作的管理模块。
      * 
-     * @param [in ] xwpt_config   : 工作配置参数。
-     * @param [in ] xpvt_reserved : 保留参数（可设置为 X_NULL）。
+     * @param [in ] xwct_config : 工作配置参数。
+     * @param [in ] xfdt_listen : 要监听的套接字。
      * 
      * @return x_int32_t
      *         - 成功，返回 0；
      *         - 失败，返回 错误码。
      */
-    x_int32_t startup(const x_work_param_t & xwpt_config, x_pvoid_t xpvt_reserved);
+    x_int32_t startup(const x_workconf_t & xwct_config, x_sockfd_t xfdt_listen);
 
     /**********************************************************/
     /**
@@ -145,7 +159,7 @@ public:
     /**
      * @brief 相关的工作配置参数。
      */
-    inline const x_work_param_t & work_param(void) const { return m_xwpt_config; }
+    inline const x_workconf_t & workconf(void) const { return m_xwct_config; }
 
     /**********************************************************/
     /**
@@ -183,7 +197,7 @@ protected:
     /**
      * @brief 保存相关的工作配置参数。
      */
-    x_void_t store_config(const x_work_param_t & xwpt_config);
+    x_void_t store_config(const x_workconf_t & xwct_config);
 
     /**********************************************************/
     /**
@@ -343,17 +357,17 @@ private:
 
     // data members
 private:
-    x_work_param_t  m_xwpt_config;   ///< 相关的工作配置参数
-    x_bool_t        m_xbt_running;   ///< 工作线程继续运行的标识值
+    x_workconf_t m_xwct_config;   ///< 相关的工作配置参数
+    x_bool_t     m_xbt_running;   ///< 工作线程继续运行的标识值
 
-    x_sockfd_t      m_xfdt_listen;   ///< 监听套接字描述符
-    x_thread_t      m_xthd_listen;   ///< 负责监听操作的工作线程
+    x_sockfd_t   m_xfdt_listen;   ///< 监听套接字描述符
+    x_thread_t   m_xthd_listen;   ///< 负责监听操作的工作线程
 
-    x_sockfd_t      m_xfdt_epollfd;  ///< epoll 文件描述符
-    x_thread_t      m_xthd_epollio;  ///< 执行 epoll_wait() 操作的 IO 事件投递操作的工作线程
+    x_sockfd_t   m_xfdt_epollfd;  ///< epoll 文件描述符
+    x_thread_t   m_xthd_epollio;  ///< 执行 epoll_wait() 操作的 IO 事件投递操作的工作线程
 
-    x_kpalive_t     m_xio_kpalive;   ///< IO 存活检测与巡检操作的工作对象
-    x_manager_t     m_xio_manager;   ///< IO 句柄对象的管理器对象
+    x_kpalive_t  m_xio_kpalive;   ///< IO 存活检测与巡检操作的工作对象
+    x_manager_t  m_xio_manager;   ///< IO 句柄对象的管理器对象
 };
 
 ////////////////////////////////////////////////////////////////////////////////

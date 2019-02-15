@@ -60,6 +60,18 @@ public:
 public:
     /**********************************************************/
     /**
+     * @brief x_master_t 在基本组件初始化完成后，额外进行数据初始化操作所使用的回调接口。
+     * 
+     * @param [in ] xht_context : 回调的上下文句柄。
+     * 
+     * @return x_int32_t
+     *         - 成功，返回 0；
+     *         - 失败，返回 错误码。
+     */
+    static x_int32_t init_extra_callback(x_handle_t xht_context);
+
+    /**********************************************************/
+    /**
      * @brief x_ftp_server_t 对象的单例调用接口。
      */
     static x_ftp_server_t & instance(void);

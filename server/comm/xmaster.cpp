@@ -215,10 +215,12 @@ x_master_t & x_master_t::instance(void)
 // 
 
 x_master_t::x_master_t(void)
-    : m_xit_srfd(-1)
+    : m_xfunc_init(X_NULL)
+    , m_xht_context(X_NULL)
+    , m_xit_srfd(-1)
     , m_xst_mpid(0)
     , m_xbt_running(X_FALSE)
-    , m_xbt_pullworker(X_TRUE)
+    , m_xbt_wpull(X_TRUE)
     , m_xht_worker(X_NULL)
 {
 
@@ -261,10 +263,20 @@ x_int32_t x_master_t::startup(x_int32_t xit_argc, x_char_t * xct_argv[])
             break;
         }
 
+        if (X_NULL != m_xfunc_init)
+        {
+            xit_error = m_xfunc_init(m_xht_context);
+            if (0 != xit_error)
+            {
+                LOGE("m_xfunc_init(m_xht_context) return error : %d", xit_error);
+                break;
+            }
+        }
+
         //======================================
         // 创建工作进程（子进程）
 
-        m_xbt_pullworker = (x_bool_t)x_config_t::instance().read_int("system", "enable_pullworker", X_TRUE);
+        m_xbt_wpull = (x_bool_t)x_config_t::instance().read_int("system", "enable_pullworker", X_TRUE);
 #if ((defined _DEBUG) || (defined DEBUG))
         m_xht_worker = (x_handle_t)x_worker_t::create_test_worker();
 #else // !((defined _DEBUG) || (defined DEBUG))
@@ -476,7 +488,7 @@ x_void_t x_master_t::cleanup(x_bool_t xbt_worker_invoking)
     reset_signal();
 
     // 仅作 对象 的资源删除操作
-    for (xmap_worker::iterator itmap = m_xmap_worker.begin(); itmap != m_xmap_worker.end(); ++itmap)
+    for (x_map_worker_t::iterator itmap = m_xmap_worker.begin(); itmap != m_xmap_worker.end(); ++itmap)
     {
         if (X_NULL != itmap->second)
         {
@@ -639,7 +651,7 @@ x_int32_t x_master_t::startup_worker(x_size_t xst_nums)
  */
 x_void_t x_master_t::erase_worker(x_ssize_t xst_wpid)
 {
-    xmap_worker::iterator itfind = m_xmap_worker.find(xst_wpid);
+    x_map_worker_t::iterator itfind = m_xmap_worker.find(xst_wpid);
     if (itfind != m_xmap_worker.end())
     {
         x_worker_t::destroy_worker((x_worker_t *)itfind->second, X_FALSE);
@@ -653,7 +665,7 @@ x_void_t x_master_t::erase_worker(x_ssize_t xst_wpid)
  */
 x_bool_t x_master_t::pull_worker(void)
 {
-    if (!m_xbt_running || !m_xbt_pullworker)
+    if (!m_xbt_running || !m_xbt_wpull)
     {
         return X_FALSE;
     }

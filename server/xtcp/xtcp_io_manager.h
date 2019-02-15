@@ -159,7 +159,7 @@ public:
 
     /**********************************************************/
     /**
-     * @brief 返回当前管理的 IO句柄对象(x_tcp_io_channel_t)。
+     * @brief 返回当前管理的 IO 句柄对象(x_tcp_io_handler_t)。
      */
     x_uint32_t count(void) const;
 
@@ -255,7 +255,7 @@ protected:
 
     /**********************************************************/
     /**
-     * @brief 强制清理掉所有的 IO句柄对象(x_tcp_io_channel_t)。
+     * @brief 强制清理掉所有的 IO句柄对象(x_tcp_io_handler_t)。
      */
     x_void_t cleanup(void);
 

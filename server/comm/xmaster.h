@@ -38,15 +38,6 @@ class x_master_t : public x_spec_subscriber_t< x_master_t, EM_EST_MASTER >
     // common data types
 public:
     /**
-     * @enum  emConstValue
-     * @brief 相关的枚举常量值。
-     */
-    typedef enum emConstValue
-    {
-
-    } emConstValue;
-
-    /**
      * @enum  emMsgKey
      * @brief 定义订阅者的消息标识 ID。
      */
@@ -55,6 +46,22 @@ public:
         MSGID_SIGQUIT   = 0x00000100,  ///< 退出操作信号
         MSGID_SIGCHLD   = 0x00000200,  ///< 工作进程结束
     } emMsgKey;
+
+    /**********************************************************/
+    /**
+     * @brief x_master_t 在基本组件初始化完成后，额外进行数据初始化操作所使用的回调函数类型。
+     * 
+     * @param [in ] xht_context : 回调的上下文句柄。
+     * 
+     * @return x_int32_t
+     *         - 成功，返回 0；
+     *         - 失败，返回 错误码。
+     */
+    typedef x_int32_t (* x_init_extra_callback_t)(x_handle_t xht_context);
+
+private:
+    using x_map_worker_t = std::map< x_ssize_t, x_handle_t >;
+    using x_func_init_t  = x_init_extra_callback_t;
 
     // common invoking
 private:
@@ -105,6 +112,16 @@ public:
      * @brief 关闭操作（执行程序退出清理的工作）。
      */
     x_void_t shutdown(void);
+
+    /**********************************************************/
+    /**
+     * @brief 设置额外初始化操作的回调接口。
+     */
+    inline x_void_t set_init_callback(x_func_init_t xfunc_init, x_handle_t xht_context)
+    {
+        m_xfunc_init  = xfunc_init;
+        m_xht_context = xht_context;
+    }
 
     // internal invoking
 protected:
@@ -200,15 +217,16 @@ protected:
 
     // data members
 protected:
-    typedef std::map< x_ssize_t, x_handle_t > xmap_worker;
+    x_func_init_t   m_xfunc_init;   ///< 在基本组件初始化完成后，额外进行数据初始化操作所使用的回调函数接口
+    x_handle_t      m_xht_context;  ///< 额外回调初始化操作时所回调的上下文句柄
 
-    x_int32_t     m_xit_srfd;        ///< 主进程单实例运行 所使用的文件锁 对应的 文件描述符
-    x_ssize_t     m_xst_mpid;        ///< 主进程的 PID 标识
-    x_bool_t      m_xbt_running;     ///< 标识是否可继续运行
-    x_bool_t      m_xbt_pullworker;  ///< 子进程退出时，是否可重新拉起子进程继续工作
-    xmap_worker   m_xmap_worker;     ///< 主进程管理的子进程对象映射表
+    x_int32_t       m_xit_srfd;     ///< 主进程单实例运行 所使用的文件锁 对应的 文件描述符
+    x_ssize_t       m_xst_mpid;     ///< 主进程的 PID 标识
+    x_bool_t        m_xbt_running;  ///< 标识是否可继续运行
+    x_bool_t        m_xbt_wpull;    ///< 子进程退出时，是否可重新拉起子进程继续工作
+    x_map_worker_t  m_xmap_worker;  ///< 主进程管理的子进程对象映射表
 
-    x_handle_t    m_xht_worker;      ///< 子进程的工作对象
+    x_handle_t      m_xht_worker;   ///< 子进程的工作对象
 };
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -39,6 +39,85 @@
 
 /**********************************************************/
 /**
+ * @brief 创建绑定指定(本地) 地址 和 端口号 的 TCP套接字。
+ * 
+ * @param [in ] xszt_host : 指定的地址（四段式 IP 地址，为 X_NULL 时，将使用 INADDR_ANY）。
+ * @param [in ] xwt_port  : 指定的本地端口号。
+ * 
+ * @return x_sockfd_t
+ *         - 成功，返回 套接字的文件描述符；
+ *         - 失败，返回 X_INVALID_SOCKFD。
+ */
+x_sockfd_t x_tcp_io_server_t::create_and_bind_sockfd(x_cstring_t xszt_host, x_uint16_t xwt_port)
+{
+    x_int32_t  xit_error   = -1;
+    x_sockfd_t xfdt_sockfd = X_INVALID_SOCKFD;
+    x_int32_t  xit_option  = 0;
+
+    struct sockaddr_in xaddr_in;
+
+    do
+    {
+        //======================================
+
+        // 创建套接字
+        xfdt_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        if (xfdt_sockfd < 0)
+        {
+            xit_error = -1;
+            LOGE("socket(AF_INET, SOCK_STREAM, 0) return xfdt_sockfd[%d], last error : %d", \
+                 xfdt_sockfd, errno);
+            break;
+        }
+
+        //======================================
+        // 绑定监听的 地址 和 端口号
+
+        memset(&xaddr_in, 0, sizeof(struct sockaddr_in));
+        xaddr_in.sin_family = AF_INET;
+        xaddr_in.sin_port   = htons(xwt_port);
+        if ((X_NULL != xszt_host) && ('\0' != xszt_host[0]))
+            inet_pton(AF_INET, xszt_host, &xaddr_in.sin_addr.s_addr);
+        else
+            xaddr_in.sin_addr.s_addr = INADDR_ANY;
+
+        xit_error = bind(xfdt_sockfd, (struct sockaddr *)&xaddr_in, sizeof(struct sockaddr_in));
+        if (0 != xit_error)
+        {
+            LOGE("bind() failed! [host: %s, port: %d, errno: %d]", \
+                 ((X_NULL != xszt_host) ? xszt_host : "INADDR_ANY"), xwt_port, errno);
+            break;
+        }
+
+        // 设置端口重用选项
+        xit_option = 1;
+        xit_error = setsockopt(xfdt_sockfd,
+                               SOL_SOCKET,
+                               SO_REUSEPORT,
+                               (const void *)&xit_option,
+                               sizeof(x_int32_t));
+        if (0 != xit_error)
+        {
+            LOGE("setsockopt(xfdt_sockfd, SOL_SOCKET, SO_REUSEADDR, ...) return xit_error[%d], last error : %d", \
+                 xit_error, errno);
+            break;
+        }
+
+        //======================================
+        xit_error = 0;
+    } while (0);
+
+    if ((0 != xit_error) && (X_INVALID_SOCKFD != xfdt_sockfd))
+    {
+        sockfd_close(xfdt_sockfd);
+        xfdt_sockfd = X_INVALID_SOCKFD;
+    }
+
+    return xfdt_sockfd;
+}
+
+/**********************************************************/
+/**
  * @brief 存活检测/巡检 的事件回调接口。
  * 
  * @param [in ] xfdt_sockfd : 套接字描述符。
@@ -83,14 +162,14 @@ x_tcp_io_server_t::~x_tcp_io_server_t(void)
 /**
  * @brief 启动 TCP 网络服务工作的管理模块。
  * 
- * @param [in ] xwpt_config   : 工作配置参数。
- * @param [in ] xpvt_reserved : 保留参数（可设置为 X_NULL）。
+ * @param [in ] xwct_config : 工作配置参数。
+ * @param [in ] xfdt_listen : 要监听的套接字。
  * 
  * @return x_int32_t
  *         - 成功，返回 0；
  *         - 失败，返回 错误码。
  */
-x_int32_t x_tcp_io_server_t::startup(const x_work_param_t & xwpt_config, x_pvoid_t xpvt_reserved)
+x_int32_t x_tcp_io_server_t::startup(const x_workconf_t & xwct_config, x_sockfd_t xfdt_listen)
 {
     x_int32_t xit_error = -1;
 
@@ -104,12 +183,12 @@ x_int32_t x_tcp_io_server_t::startup(const x_work_param_t & xwpt_config, x_pvoid
         }
 
         // 存储工作配置参数
-        store_config(xwpt_config);
+        store_config(xwct_config);
 
         // 设置进程可打开的文件数量
-        if (!set_max_fds(m_xwpt_config.xut_epoll_maxsockfds + ECV_MIN_SOCKFDS))
+        if (!set_max_fds(m_xwct_config.xut_epoll_maxsockfds + ECV_MIN_SOCKFDS))
         {
-            LOGE("set_max_fds(%d) return X_FALSE", m_xwpt_config.xut_epoll_maxsockfds + ECV_MIN_SOCKFDS);
+            LOGE("set_max_fds(%d) return X_FALSE", m_xwct_config.xut_epoll_maxsockfds + ECV_MIN_SOCKFDS);
             xit_error = -1;
             break;
         }
@@ -126,14 +205,32 @@ x_int32_t x_tcp_io_server_t::startup(const x_work_param_t & xwpt_config, x_pvoid
             break;
         }
 
-        // 创建监听套接字
-        m_xfdt_listen = create_listen_sockfd(m_xwpt_config.xszt_host, m_xwpt_config.xut_port);
-        if (X_INVALID_SOCKFD == m_xfdt_listen)
+        // 设置监听套接字
+        if (X_INVALID_SOCKFD != xfdt_listen)
         {
-            LOGE("create_listen_sockfd(host[%s], port[%d]) failed, last error code : %d", \
-                 m_xwpt_config.xszt_host, m_xwpt_config.xut_port, errno);
-            xit_error = errno;
-            break;
+            xit_error = listen(xfdt_listen, SOMAXCONN);
+            if (0 != xit_error)
+            {
+                LOGE("listen(xfdt_listen[%s:%d], SOMAXCONN) return xit_error[%d], last error : %d",
+                     sockfd_local_ip(xfdt_listen, LOG_BUF(64), 64),
+                     sockfd_local_port(xfdt_listen),
+                     xit_error,
+                     errno);
+                break;
+            }
+
+            m_xfdt_listen = xfdt_listen;
+        }
+        else
+        {
+            m_xfdt_listen = create_listen_sockfd(m_xwct_config.xszt_host, m_xwct_config.xut_port);
+            if (X_INVALID_SOCKFD == m_xfdt_listen)
+            {
+                LOGE("create_listen_sockfd(host[%s], port[%d]) failed, last error code : %d", \
+                     m_xwct_config.xszt_host, m_xwct_config.xut_port, errno);
+                xit_error = errno;
+                break;
+            }
         }
 
         //======================================
@@ -156,24 +253,24 @@ x_int32_t x_tcp_io_server_t::startup(const x_work_param_t & xwpt_config, x_pvoid
         //======================================
         // 启动 IO 保活检测模块 与 IO 管理模块
 
-        xit_error = m_xio_kpalive.start(m_xwpt_config.xut_tmout_kpalive,
-                                        m_xwpt_config.xut_tmout_baleful,
-                                        m_xwpt_config.xut_tmout_mverify);
+        xit_error = m_xio_kpalive.start(m_xwct_config.xut_tmout_kpalive,
+                                        m_xwct_config.xut_tmout_baleful,
+                                        m_xwct_config.xut_tmout_mverify);
         if (0 != xit_error)
         {
             LOGE("m_xio_kpalive.start(tmout_kpalive[%d], mout_baleful[%d], tmout_mverify[%d]) return error : %d",
-                 m_xwpt_config.xut_tmout_kpalive,
-                 m_xwpt_config.xut_tmout_baleful,
-                 m_xwpt_config.xut_tmout_mverify,
+                 m_xwct_config.xut_tmout_kpalive,
+                 m_xwct_config.xut_tmout_baleful,
+                 m_xwct_config.xut_tmout_mverify,
                  xit_error);
             break;
         }
 
-        xit_error = m_xio_manager.start(m_xwpt_config.xut_ioman_threads);
+        xit_error = m_xio_manager.start(m_xwct_config.xut_ioman_threads);
         if (0 != xit_error)
         {
-            LOGE("m_xio_manager.startup(m_xwpt_config.xut_ioman_threads[%d]) return error : %d",
-                 m_xwpt_config.xut_ioman_threads, xit_error);
+            LOGE("m_xio_manager.startup(m_xwct_config.xut_ioman_threads[%d]) return error : %d",
+                 m_xwct_config.xut_ioman_threads, xit_error);
             break;
         }
 
@@ -233,25 +330,25 @@ x_void_t x_tcp_io_server_t::shutdown(void)
 /**
  * @brief 保存相关的工作配置参数。
  */
-x_void_t x_tcp_io_server_t::store_config(const x_work_param_t & xwpt_config)
+x_void_t x_tcp_io_server_t::store_config(const x_workconf_t & xwct_config)
 {
-    m_xwpt_config = xwpt_config;
+    m_xwct_config = xwct_config;
 
     // 校正 最大连接数
-    m_xwpt_config.xut_epoll_maxsockfds =
-        limit_bound(m_xwpt_config.xut_epoll_maxsockfds,
+    m_xwct_config.xut_epoll_maxsockfds =
+        limit_bound(m_xwct_config.xut_epoll_maxsockfds,
                     ECV_MIN_SOCKFDS,
                     ECV_MAX_SOCKFDS);
 
     // 校正 epoll_wait() 等待操作的最大事件数量
-    m_xwpt_config.xut_epoll_waitevents =
-        limit_bound(m_xwpt_config.xut_epoll_waitevents,
+    m_xwct_config.xut_epoll_waitevents =
+        limit_bound(m_xwct_config.xut_epoll_waitevents,
                     ECV_MIN_EPEVENTS,
                     ECV_MAX_EPEVENTS);
 
     // 校正 IO 管理模块的工作线程数量
-    m_xwpt_config.xut_ioman_threads =
-        limit_bound(m_xwpt_config.xut_ioman_threads,
+    m_xwct_config.xut_ioman_threads =
+        limit_bound(m_xwct_config.xut_ioman_threads,
                     1,
                     limit_lower(2 * std::thread::hardware_concurrency(), 1));
 }
@@ -477,20 +574,6 @@ x_sockfd_t x_tcp_io_server_t::create_listen_sockfd(x_cstring_t xszt_host, x_uint
             break;
         }
 
-        // 设置地址重用选项
-        xit_option = 1;
-        xit_error = setsockopt(xfdt_listen,
-                               SOL_SOCKET,
-                               SO_REUSEADDR,
-                               (const void *)&xit_option,
-                               sizeof(x_int32_t));
-        if (0 != xit_error)
-        {
-            LOGE("setsockopt(xfdt_listen, SOL_SOCKET, SO_REUSEADDR, ...) return xit_error[%d], last error : %d", \
-                 xit_error, errno);
-            break;
-        }
-
         //======================================
         // 绑定监听的 地址 和 端口号
 
@@ -510,13 +593,31 @@ x_sockfd_t x_tcp_io_server_t::create_listen_sockfd(x_cstring_t xszt_host, x_uint
             break;
         }
 
+        // 设置端口重用选项
+        xit_option = 1;
+        xit_error = setsockopt(xfdt_listen,
+                               SOL_SOCKET,
+                               SO_REUSEPORT,
+                               (const void *)&xit_option,
+                               sizeof(x_int32_t));
+        if (0 != xit_error)
+        {
+            LOGE("setsockopt(xfdt_listen, SOL_SOCKET, SO_REUSEADDR, ...) return xit_error[%d], last error : %d", \
+                 xit_error, errno);
+            break;
+        }
+
         //======================================
         // 设置监听模式
 
         xit_error = listen(xfdt_listen, SOMAXCONN);
         if (0 != xit_error)
         {
-            LOGE("listen() return xit_error[%d], last error : %d", xit_error, errno);
+            LOGE("listen(xfdt_listen[%s:%d], SOMAXCONN) return xit_error[%d], last error : %d",
+                 sockfd_local_ip(xfdt_listen, LOG_BUF(64), 64),
+                 sockfd_local_port(xfdt_listen),
+                 xit_error,
+                 errno);
             break;
         }
 
@@ -583,7 +684,7 @@ x_void_t x_tcp_io_server_t::thread_epollio(void)
     const x_int32_t xit_nthread = 1;
 
     std::vector< struct epoll_event > xvec_events;
-    xvec_events.resize(work_param().xut_epoll_waitevents);
+    xvec_events.resize(workconf().xut_epoll_waitevents);
 
     while (m_xbt_running)
     {
@@ -703,10 +804,10 @@ x_int32_t x_tcp_io_server_t::io_handle_accept(x_int32_t xit_nthread, x_sockfd_t 
         //======================================
 
         // 判断是否已经达到最大连接数量
-        if (m_xio_manager.count() >= m_xwpt_config.xut_epoll_maxsockfds)
+        if (m_xio_manager.count() >= m_xwct_config.xut_epoll_maxsockfds)
         {
-            LOGE("[thread_index: %d] m_xio_manager.count()[%d] >= m_xwpt_config.xut_epoll_maxsockfds[%d]",
-                 xit_nthread, m_xio_manager.count(), m_xwpt_config.xut_epoll_maxsockfds);
+            LOGE("[thread_index: %d] m_xio_manager.count()[%d] >= m_xwct_config.xut_epoll_maxsockfds[%d]",
+                 xit_nthread, m_xio_manager.count(), m_xwct_config.xut_epoll_maxsockfds);
             break;
         }
 

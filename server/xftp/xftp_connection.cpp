@@ -24,12 +24,12 @@
 #include "xftp_connection.h"
 
 ////////////////////////////////////////////////////////////////////////////////
-// x_ftp_connection_t
+// x_ftp_channel_t
 
 //====================================================================
 
 // 
-// x_ftp_connection_t : common invoking
+// x_ftp_channel_t : common invoking
 // 
 
 /**********************************************************/
@@ -43,8 +43,8 @@
  * @return x_uint32_t
  *         - 返回分割到的 IO 消息数量。
  */
-x_uint32_t x_ftp_connection_t::xmsg_split(x_tcp_io_message_t & xio_message,
-                                          std::list< x_tcp_io_message_t > & xlst_iomsg)
+x_uint32_t x_ftp_channel_t::xmsg_split(x_tcp_io_message_t & xio_message,
+                                       std::list< x_tcp_io_message_t > & xlst_iomsg)
 {
     x_uchar_t * xct_dptr = xio_message.data();
     x_uint32_t  xut_dlen = xio_message.rlen();
@@ -92,16 +92,16 @@ x_uint32_t x_ftp_connection_t::xmsg_split(x_tcp_io_message_t & xio_message,
 //====================================================================
 
 // 
-// x_ftp_connection_t : constructor/destructor
+// x_ftp_channel_t : constructor/destructor
 // 
 
-x_ftp_connection_t::x_ftp_connection_t(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
+x_ftp_channel_t::x_ftp_channel_t(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
     : x_tcp_io_channel_t(xht_manager, xfdt_sockfd)
 {
 
 }
 
-x_ftp_connection_t::~x_ftp_connection_t(void)
+x_ftp_channel_t::~x_ftp_channel_t(void)
 {
 
 }
@@ -109,7 +109,7 @@ x_ftp_connection_t::~x_ftp_connection_t(void)
 //====================================================================
 
 // 
-// x_ftp_connection_t : overrides
+// x_ftp_channel_t : overrides
 // 
 
 /**********************************************************/
@@ -122,7 +122,7 @@ x_ftp_connection_t::~x_ftp_connection_t(void)
  *         - 返回值 >= 0，表示操作产生的事件数量。
  *         - 返回值 <  0，表示产生错误，后续则可关闭该业务层工作对象。
  */
-x_int32_t x_ftp_connection_t::post_req_xmsg(x_tcp_io_message_t & xio_message)
+x_int32_t x_ftp_channel_t::post_req_xmsg(x_tcp_io_message_t & xio_message)
 {
     std::list< x_tcp_io_message_t > xlst_iomsg;
 
@@ -179,14 +179,14 @@ x_int32_t x_ftp_connection_t::post_req_xmsg(x_tcp_io_message_t & xio_message)
 //====================================================================
 
 // 
-// x_ftp_connection_t : public interfaces
+// x_ftp_channel_t : public interfaces
 // 
 
 
 //====================================================================
 
 // 
-// x_ftp_connection_t : internal invoking
+// x_ftp_channel_t : internal invoking
 // 
 
 /**********************************************************/
@@ -199,7 +199,7 @@ x_int32_t x_ftp_connection_t::post_req_xmsg(x_tcp_io_message_t & xio_message)
  *         - 成功，返回 0；
  *         - 失败，返回 错误码。
  */
-x_int32_t x_ftp_connection_t::post_res_xmsg(const x_io_msgctxt_t & xio_msgctxt)
+x_int32_t x_ftp_channel_t::post_res_xmsg(const x_io_msgctxt_t & xio_msgctxt)
 {
     if (X_NULL == get_manager())
     {

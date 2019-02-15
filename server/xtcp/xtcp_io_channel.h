@@ -30,6 +30,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 class x_tcp_io_task_t;
+class x_tcp_io_creator_t;
 class x_tcp_io_holder_t;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -41,8 +42,9 @@ class x_tcp_io_holder_t;
  */
 class x_tcp_io_channel_t
 {
-    friend class x_tcp_io_task_t;
-    friend class x_tcp_io_holder_t;
+    friend x_tcp_io_task_t;
+    friend x_tcp_io_creator_t;
+    friend x_tcp_io_holder_t;
 
     // common data types
 public:
@@ -268,7 +270,7 @@ private:
     /**
      * @brief 将首个 IO 请求消息转移到 请求队列中。
      * @note  该接口只在创建完对应业务层工作对象后被调用。
-     * @see   x_tcp_io_holder::try_create_io_handle()
+     * @see   x_tcp_io_creator_t::try_create_io_channel()
      */
     x_int32_t req_xmsg_first_dump(x_iomsg_t & xio_message);
 

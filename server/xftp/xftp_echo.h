@@ -32,49 +32,23 @@
  * @class x_ftp_echo_t
  * @brief 提供 ECHO 测试服务的业务层工作对象。
  */
-class x_ftp_echo_t : public x_ftp_connection_t
+class x_ftp_echo_t : public x_ftp_connection_t< x_ftp_echo_t, 0x0010 >
 {
+    friend x_super_t;
+
     // common data types
 public:
-    /**
-     * @enum  emConstValue
-     * @brief 相关的枚举常量值。
-     */
-    typedef enum emConstValue
-    {
-        ECV_CONNECTION_TYPE  = 0x0010,  ///< 业务层工作对象的连接类型
-    } emConstValue;
-
     /**
      * @enum  emIoContextCmid
      * @brief IO 操作的命令 ID 表。
      */
     typedef enum emIoContextCmid
     {
-        CMID_ECHO_LOGIN      = 0x0010,  ///< 登录
-        CMID_ECHO_HBEAT      = 0x2000,  ///< 心跳
-        CMID_ECHO_TEXT       = 0x2010,  ///< 文本内容反射
-    } emIoContextCmid;
+        CMID_ECHO_LOGIN  = x_super_t::ECV_CONNECTION_TYPE,  ///< 登录
 
-    // common invoking
-public:
-    /**********************************************************/
-    /**
-     * @brief x_ftp_echo_t 对象创建接口。
-     * 
-     * @param [in ] xht_manager : 业务层工作对象所隶属的 IO 管理模块句柄。
-     * @param [in ] xfdt_sockfd : 业务层工作对象的 套接字描述符。
-     * @param [in ] xht_msgctxt : 指向创建业务层工作对象的 IO 请求消息（首个 IO 消息）。
-     * @param [out] xht_channel : 操作成功所返回的 x_tcp_io_channel_t 对象句柄。
-     * 
-     * @return x_int32_t
-     *         - 成功，返回 0；
-     *         - 失败，返回 错误码。
-     */
-    static x_int32_t create(x_handle_t xht_manager,
-                            x_sockfd_t xfdt_sockfd,
-                            x_handle_t xht_msgctxt,
-                            x_handle_t & xht_channel);
+        CMID_ECHO_HBEAT  = 0x2000,  ///< 心跳
+        CMID_ECHO_TEXT   = 0x2010,  ///< 文本内容反射
+    } emIoContextCmid;
 
     // constructor/destructor
 private:

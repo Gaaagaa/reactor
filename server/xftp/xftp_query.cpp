@@ -23,57 +23,8 @@
 #include "xcomm.h"
 #include "xftp_query.h"
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/tcp.h>
-
 ////////////////////////////////////////////////////////////////////////////////
 // x_ftp_query_t
-
-//====================================================================
-
-// 
-// x_ftp_query_t : common invoking
-// 
-
-static_assert((x_int32_t)x_ftp_query_t::ECV_CONNECTION_TYPE ==
-              (x_int32_t)x_ftp_query_t::CMID_QUERY_LOGIN,
-              "ECV_CONNECTION_TYPE == CMID_QUERY_LOGIN");
-
-/**********************************************************/
-/**
- * @brief x_ftp_query_t 对象创建接口。
- * 
- * @param [in ] xht_manager : 业务层工作对象所隶属的 IO 管理模块句柄。
- * @param [in ] xfdt_sockfd : 业务层工作对象的 套接字描述符。
- * @param [in ] xht_msgctxt : 指向创建业务层工作对象的 IO 请求消息（首个 IO 消息）。
- * @param [out] xht_channel : 操作成功所返回的 x_tcp_io_channel_t 对象句柄。
- * 
- * @return x_int32_t
- *         - 成功，返回 0；
- *         - 失败，返回 错误码。
- */
-x_int32_t x_ftp_query_t::create(x_handle_t xht_manager,
-                                x_sockfd_t xfdt_sockfd,
-                                x_handle_t xht_msgctxt,
-                                x_handle_t & xht_channel)
-{
-    //======================================
-
-    x_ftp_query_t * xthis_ptr = new x_ftp_query_t(xht_manager, xfdt_sockfd);
-    xht_channel = (x_handle_t)(xthis_ptr);
-    XASSERT(X_NULL != xht_channel);
-
-    //======================================
-
-    x_uint32_t xut_value = 1;
-    setsockopt(xfdt_sockfd, SOL_SOCKET, SO_KEEPALIVE, (const x_char_t *)&xut_value, sizeof(x_uint32_t));
-    setsockopt(xfdt_sockfd, SOL_TCP   , TCP_NODELAY , (const x_char_t *)&xut_value, sizeof(x_uint32_t));
-
-    //======================================
-
-    return 0;
-}
 
 //====================================================================
 
@@ -82,7 +33,7 @@ x_int32_t x_ftp_query_t::create(x_handle_t xht_manager,
 // 
 
 x_ftp_query_t::x_ftp_query_t(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
-    : x_ftp_connection_t(xht_manager, xfdt_sockfd)
+    : x_super_t(xht_manager, xfdt_sockfd)
 {
 
 }
