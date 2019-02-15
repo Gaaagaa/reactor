@@ -4,7 +4,7 @@
 TARGET = ../bin/reactor
 
 # makefile command: make CC_EXTRA='-D _DEBUG'
-# makefile command: make CC_EXTRA='-D _DEBUG -g'
+# makefile command: make CC_EXTRA='-D _DEBUG -D ENABLE_XASSERT=1 -g'
 # startup  command: ./reactor -d -l log.conf -r run.conf
 
 #========================================
