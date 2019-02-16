@@ -29,6 +29,176 @@
 #include "xtcp_io_holder.h"
 #include "xtcp_io_manager.h"
 
+#include "xthreadpool.h"
+#include "xobjectpool.h"
+
+////////////////////////////////////////////////////////////////////////////////
+// x_tcp_io_task_t
+
+/**
+ * @class x_tcp_io_task_t
+ * @brief 执行业务层的 IO 事件操作的任务对象（驱动 x_tcp_io_channel_t 进行工作）。
+ */
+class x_tcp_io_task_t : public x_threadpool_t::x_task_t
+{
+    // common data types
+public:
+    using x_io_cwptr_t = std::weak_ptr<   x_tcp_io_channel_t >;
+    using x_io_csptr_t = std::shared_ptr< x_tcp_io_channel_t >;
+
+    /**
+     * @class x_task_pool_t
+     * @brief 管理 x_tcp_io_task_t 的对象池类。
+     */
+    class x_taskpool_t : public x_objectpool_t< x_tcp_io_task_t >
+                       , protected x_task_deleter_t
+    {
+        // common data types
+    protected:
+        using x_deleter_t  = x_task_deleter_t;
+
+        // overrides : x_deleter_t
+    protected:
+        /**********************************************************/
+        /**
+         * @brief 对 任务对象 进行资源回收操作（删除操作）。
+         */
+        virtual void delete_task(x_task_ptr_t xtask_ptr) override
+        {
+            if (nullptr != xtask_ptr)
+            {
+                recyc((x_taskpool_t::x_object_ptr_t)xtask_ptr);
+            }
+        }
+    };
+
+    /**
+     * @enum  emIoTaskEventType
+     * @brief 任务对象的 IO 操作类型枚举值。
+     */
+    typedef enum emIoTaskEventType
+    {
+        EIO_TASK_CREATED  = 0x0010,  ///< IO 通道对象的 初建事件
+        EIO_TASK_DESTROY  = 0x0020,  ///< IO 通道对象的 销毁事件
+        EIO_TASK_READING  = 0x0030,  ///< IO 读事件
+        EIO_TASK_WRITING  = 0x0040,  ///< IO 写事件
+        EIO_TASK_MSGPUMP  = 0x0050,  ///< IO 消息投递事件
+    } emIoTaskEventType;
+
+    // common invoking
+public:
+    /**********************************************************/
+    /**
+     * @brief 共用的 任务对象池。
+     */
+    static inline x_taskpool_t & taskpool(void)
+    {
+        return _S_comm_taskpool;
+    }
+
+    // common data
+private:
+    static x_taskpool_t _S_comm_taskpool;   ///< 共用的 任务对象池
+
+    // constructor/destructor
+public:
+    /**********************************************************/
+    /**
+     * @brief 任务对象的默认构造函数。
+     * 
+     * @param [in ] xio_cwptr : 目标操作的 x_tcp_io_channel_t 对象。
+     * @param [in ] xut_event : 任务对象所要处理事件（参看 emIoTaskEventType 枚举值）。
+     */
+    explicit x_tcp_io_task_t(const x_io_cwptr_t & xio_cwptr, x_uint32_t xut_event);
+    virtual ~x_tcp_io_task_t(void);
+
+    // overrides
+protected:
+    /**********************************************************/
+    /**
+     * @brief 任务对象执行流程的抽象接口。
+     */
+    virtual void run(x_running_checker_t * xchecker_ptr) override;
+
+    /**********************************************************/
+    /**
+     * @brief 判断 任务对象 是否挂起。
+     */
+    virtual bool is_suspend(void) const override;
+
+    /**********************************************************/
+    /**
+     * @brief 设置任务对象的运行标识。
+     */
+    virtual void set_running_flag(bool xrunning_flag) override;
+
+    /**********************************************************/
+    /**
+     * @brief 获取任务对象的删除器。
+     */
+    virtual const x_task_deleter_t * get_deleter(void) const override;
+
+    // internal invoking
+protected:
+    /**********************************************************/
+    /**
+     * @brief 执行写操作的工作流程。
+     * 
+     * @param [in ] xio_csptr : 目标操作的 IO 通道对象。
+     * @param [in ] xit_wmsgs : 可操作的 IO 消息最大数量。
+     * 
+     * @return x_int32_t
+     *         - 成功，返回 0；
+     *         - 失败，返回 错误码。
+     */
+    x_int32_t workflow_write(x_io_csptr_t & xio_csptr, x_int16_t xit_wmsgs);
+
+    /**********************************************************/
+    /**
+     * @brief 初建 IO 通道对象事件 的处理流程。
+     */
+    x_int32_t handle_created(void);
+
+    /**********************************************************/
+    /**
+     * @brief 销毁 IO 通道对象事件 的处理流程。
+     */
+    x_int32_t handle_destroy(void);
+
+    /**********************************************************/
+    /**
+     * @brief IO 读事件 的处理流程。
+     */
+    x_int32_t handle_reading(void);
+
+    /**********************************************************/
+    /**
+     * @brief IO 写事件 的处理流程。
+     */
+    x_int32_t handle_writing(void);
+
+    /**********************************************************/
+    /**
+     * @brief IO 消息投递事件 的处理流程。
+     */
+    x_int32_t handle_msgpump(void);
+
+    // data members
+private:
+    x_io_cwptr_t  m_xio_cwptr;  ///< 目标操作的 x_tcp_io_channel_t 对象
+    x_io_csptr_t  m_xio_csptr;  ///< 目标操作的 x_tcp_io_channel_t 对象（m_xut_event == EIO_TASK_DESTROY 时有效）
+    x_uint32_t    m_xut_event;  ///< 任务对象所要处理事件（参看 emIoTaskEventType 枚举值）
+
+#ifdef _DEBUG
+    x_int64_t     m_xit_timev;  ///< 任务提交时的时间戳
+#endif // _DEBUG
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+using x_io_task_t  = x_tcp_io_task_t;
+using x_io_mangr_t = x_tcp_io_manager_t *;
+
 ////////////////////////////////////////////////////////////////////////////////
 
 /**********************************************************/
@@ -39,11 +209,11 @@ x_cstring_t task_event_text(x_uint32_t xut_event)
 {
     switch (xut_event)
     {
-    case x_tcp_io_task_t::EIO_TASK_CREATED : return "EIO_TASK_CREATED"; break;
-    case x_tcp_io_task_t::EIO_TASK_DESTROY : return "EIO_TASK_DESTROY"; break;
-    case x_tcp_io_task_t::EIO_TASK_READING : return "EIO_TASK_READING"; break;
-    case x_tcp_io_task_t::EIO_TASK_WRITING : return "EIO_TASK_WRITING"; break;
-    case x_tcp_io_task_t::EIO_TASK_MSGPUMP : return "EIO_TASK_MSGPUMP"; break;
+    case x_io_task_t::EIO_TASK_CREATED : return "EIO_TASK_CREATED"; break;
+    case x_io_task_t::EIO_TASK_DESTROY : return "EIO_TASK_DESTROY"; break;
+    case x_io_task_t::EIO_TASK_READING : return "EIO_TASK_READING"; break;
+    case x_io_task_t::EIO_TASK_WRITING : return "EIO_TASK_WRITING"; break;
+    case x_io_task_t::EIO_TASK_MSGPUMP : return "EIO_TASK_MSGPUMP"; break;
 
     default:
         break;
@@ -201,8 +371,6 @@ const x_task_deleter_t * x_tcp_io_task_t::get_deleter(void) const
  */
 x_int32_t x_tcp_io_task_t::workflow_write(x_io_csptr_t & xio_csptr, x_int16_t xit_wmsgs)
 {
-    using x_io_mangr_t = x_tcp_io_manager_t *;
-
     x_int32_t    xit_error = -1;
     x_int32_t    xit_nmsgs = xit_wmsgs;
     x_io_mangr_t xio_mangr = (x_io_mangr_t)xio_csptr->get_manager();
@@ -256,8 +424,6 @@ x_int32_t x_tcp_io_task_t::workflow_write(x_io_csptr_t & xio_csptr, x_int16_t xi
  */
 x_int32_t x_tcp_io_task_t::handle_created(void)
 {
-    using x_io_mangr_t = x_tcp_io_manager_t *;
-
     x_int32_t    xit_error = -1;
     x_int32_t    xit_nmsgs = 0;
     x_io_csptr_t xio_csptr = nullptr;
@@ -347,8 +513,6 @@ x_int32_t x_tcp_io_task_t::handle_destroy(void)
  */
 x_int32_t x_tcp_io_task_t::handle_reading(void)
 {
-    using x_io_mangr_t = x_tcp_io_manager_t *;
-
     x_int32_t    xit_error = -1;
     x_int32_t    xit_nmsgs = 0;
     x_int32_t    xit_wmsgs = 0;
@@ -434,8 +598,6 @@ x_int32_t x_tcp_io_task_t::handle_reading(void)
  */
 x_int32_t x_tcp_io_task_t::handle_writing(void)
 {
-    using x_io_mangr_t = x_tcp_io_manager_t *;
-
     x_int32_t    xit_error = -1;
     x_io_csptr_t xio_csptr = nullptr;
     x_io_mangr_t xio_mangr = nullptr;
@@ -490,8 +652,6 @@ x_int32_t x_tcp_io_task_t::handle_writing(void)
  */
 x_int32_t x_tcp_io_task_t::handle_msgpump(void)
 {
-    using x_io_mangr_t = x_tcp_io_manager_t *;
-
     x_int32_t    xit_error = -1;
     x_int32_t    xit_nmsgs = 0;
     x_int32_t    xit_rmsgs = 0;
@@ -602,7 +762,7 @@ x_int32_t x_tcp_io_creator_t::io_reading(x_handle_t xht_manager, x_sockfd_t xfdt
 {
     x_int32_t  xit_error   = -1;
 
-    x_tcp_io_manager_t * xmanager_ptr = (x_tcp_io_manager_t *)xht_manager;
+    x_io_mangr_t xio_mangr = (x_io_mangr_t)xht_manager;
 
     do
     {
@@ -636,7 +796,7 @@ x_int32_t x_tcp_io_creator_t::io_reading(x_handle_t xht_manager, x_sockfd_t xfdt
         //======================================
         // 提交 “业务层的 IO 初建事件” 的业务处理任务
 
-        xmanager_ptr->submit_io_task(
+        xio_mangr->submit_io_task(
             x_io_task_t::taskpool().alloc(
                 x_io_cwptr_t(m_xio_csptr), x_io_task_t::EIO_TASK_CREATED));
 
@@ -669,7 +829,7 @@ x_int32_t x_tcp_io_creator_t::try_create_io_channel(x_handle_t xht_manager, x_so
     x_int32_t  xit_error = -1;
     x_uint32_t xut_count = 0;
 
-    x_tcp_io_manager_t * xmanager_ptr = (x_tcp_io_manager_t *)xht_manager;
+    x_io_mangr_t xio_mangr = (x_io_mangr_t)xht_manager;
 
     XASSERT(X_NULL != xht_manager);
     XASSERT(X_INVALID_SOCKFD != xfdt_sockfd);
@@ -711,10 +871,10 @@ x_int32_t x_tcp_io_creator_t::try_create_io_channel(x_handle_t xht_manager, x_so
         xio_create_args.xht_message = (x_handle_t)&m_xmsg_swap;
         xio_create_args.xht_channel = X_NULL;
 
-        xit_error = xmanager_ptr->create_io_channel(xio_create_args);
+        xit_error = xio_mangr->create_io_channel(xio_create_args);
         if (0 != xit_error)
         {
-            LOGE("xmanager_ptr->create_io_channel(xio_create_args[xfdt_sockfd : %d]) return error : %d",
+            LOGE("xio_mangr->create_io_channel(xio_create_args[xfdt_sockfd : %d]) return error : %d",
                     xfdt_sockfd, xit_error);
             break;
         }
@@ -757,6 +917,21 @@ x_int32_t x_tcp_io_creator_t::try_create_io_channel(x_handle_t xht_manager, x_so
 //====================================================================
 
 // 
+// x_tcp_io_holder_t : common invoking
+// 
+
+/**********************************************************/
+/**
+ * @brief 释放任务对象池中缓存的任务对象。
+ */
+x_void_t x_tcp_io_holder_t::release_taskpool(void)
+{
+    x_io_task_t::taskpool().free_extra();
+}
+
+//====================================================================
+
+// 
 // x_tcp_io_holder_t : constructor/destructor
 // 
 
@@ -770,11 +945,11 @@ x_tcp_io_holder_t::~x_tcp_io_holder_t(void)
 {
     if (nullptr != m_xio_csptr)
     {
-        x_tcp_io_manager_t * xmanager_ptr =
-                    (x_tcp_io_manager_t *)m_xio_csptr->get_manager();
-        if (nullptr != xmanager_ptr)
+        x_io_mangr_t xio_mangr =
+                    (x_io_mangr_t)m_xio_csptr->get_manager();
+        if (nullptr != xio_mangr)
         {
-            xmanager_ptr->submit_io_task(
+            xio_mangr->submit_io_task(
                 x_io_task_t::taskpool().alloc(
                     x_io_cwptr_t(m_xio_csptr), x_io_task_t::EIO_TASK_DESTROY));
         }
@@ -804,7 +979,7 @@ x_int32_t x_tcp_io_holder_t::io_reading(x_handle_t xht_manager, x_sockfd_t xfdt_
 {
     x_int32_t  xit_error = -1;
  
-    x_tcp_io_manager_t * xmanager_ptr = (x_tcp_io_manager_t *)xht_manager;
+    x_io_mangr_t xio_mangr = (x_io_mangr_t)xht_manager;
 
     do
     {
@@ -821,7 +996,7 @@ x_int32_t x_tcp_io_holder_t::io_reading(x_handle_t xht_manager, x_sockfd_t xfdt_
         //======================================
         // 提交 “业务层的 IO 读事件” 的业务处理任务
 
-        xmanager_ptr->submit_io_task(
+        xio_mangr->submit_io_task(
             x_io_task_t::taskpool().alloc(
                 x_io_cwptr_t(m_xio_csptr), x_io_task_t::EIO_TASK_READING));
 
@@ -847,7 +1022,7 @@ x_int32_t x_tcp_io_holder_t::io_writing(x_handle_t xht_manager, x_sockfd_t xfdt_
 {
     x_int32_t  xit_error = -1;
 
-    x_tcp_io_manager_t * xmanager_ptr = (x_tcp_io_manager_t *)xht_manager;
+    x_io_mangr_t xio_mangr = (x_io_mangr_t)xht_manager;
 
     do
     {
@@ -864,7 +1039,7 @@ x_int32_t x_tcp_io_holder_t::io_writing(x_handle_t xht_manager, x_sockfd_t xfdt_
         //======================================
         // 提交 “业务层的 IO 写事件” 的业务处理任务
 
-        xmanager_ptr->submit_io_task(
+        xio_mangr->submit_io_task(
             x_io_task_t::taskpool().alloc(
                 x_io_cwptr_t(m_xio_csptr), x_io_task_t::EIO_TASK_WRITING));
 
@@ -895,4 +1070,3 @@ x_int32_t x_tcp_io_holder_t::io_verify(x_handle_t xht_manager, x_sockfd_t xfdt_s
 
     return 0;
 }
-

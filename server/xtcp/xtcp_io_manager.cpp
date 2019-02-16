@@ -112,7 +112,7 @@ x_void_t x_tcp_io_manager_t::stop(void)
     m_xthreadpool.cleanup_task();
     cleanup();
 
-    x_tcp_io_task_t::taskpool().free_extra();
+    x_tcp_io_holder_t::release_taskpool();
     x_tcp_io_message_t::xmsg_mempool().release_timeout_memblock(0);
 }
 
