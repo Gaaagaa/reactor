@@ -846,7 +846,7 @@ x_int32_t x_tcp_io_holder_t::io_reading(x_handle_t xht_manager, x_sockfd_t xfdt_
 x_int32_t x_tcp_io_holder_t::io_writing(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
 {
     x_int32_t  xit_error = -1;
- 
+
     x_tcp_io_manager_t * xmanager_ptr = (x_tcp_io_manager_t *)xht_manager;
 
     do
