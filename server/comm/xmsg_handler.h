@@ -80,7 +80,7 @@ public:
 /**
  * @class x_spec_subscriber_t< _Ty, _Mt >
  * @brief 消息订阅者的模板类。
- * @note  特化消息分派接口的格式为 func(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)。
+ * @note  特化消息分派接口的格式为 memfunc(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)。
  * @param [in ] _Ty : 订阅者的派生类。
  * @param [in ] _Mt : 订阅的消息类型。
  */
