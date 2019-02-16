@@ -7,7 +7,7 @@
         "**/.DS_Store": true,
         "**/*.o": true,
         "**/tmp": true,
-        "**/third": true
+        "**/third/source": true
     },
     
     "files.associations": {
@@ -75,6 +75,8 @@
         "queue": "cpp",
         "hash_map": "cpp",
         "memory": "cpp",
-        "set": "cpp"
+        "set": "cpp",
+        "string": "cpp",
+        "ios": "cpp"
     }
 }
