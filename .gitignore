@@ -2,3 +2,4 @@
 tmp
 bin/reactor
 test/xftp_echo_client/xecho
+test/xftp_client
