@@ -317,7 +317,7 @@ x_void_t x_ftp_server_t::unregister_iotype(x_uint16_t xut_iotype)
  *         - 成功，返回 0；
  *         - 失败，返回 错误码。
  */
-x_int32_t x_ftp_server_t::get_file_list(std::list< std::string > & xlst_files,
+x_int32_t x_ftp_server_t::get_file_list(x_list_file_t & xlst_files,
                                         x_uint32_t xut_max_files)
 {
     struct stat     xstat_buf;
@@ -374,7 +374,7 @@ x_int32_t x_ftp_server_t::get_file_list(std::list< std::string > & xlst_files,
         xstr_filename = xdirent_ptr->d_name;
         if (!xstr_filename.empty())
         {
-            xlst_files.push_back(xstr_filename);
+            xlst_files.push_back(std::make_pair(xstr_filename, (x_uint32_t)xstat_buf.st_size));
         }
 
         if (++xut_count >= xut_max_files)

@@ -56,6 +56,9 @@ public:
     /** [ 类型，创建接口函数 ] */
     typedef std::map< x_uint16_t, x_func_create_t > x_map_func_create_t;
 
+    /** 文件列表[ 文件名，文件大小 ] */
+    typedef std::list< std::pair< std::string, x_uint32_t > > x_list_file_t;
+
     // common invoking
 public:
     /**********************************************************/
@@ -152,7 +155,7 @@ public:
      *         - 成功，返回 0；
      *         - 失败，返回 错误码。
      */
-    x_int32_t get_file_list(std::list< std::string > & xlst_files, x_uint32_t xut_max_files);
+    x_int32_t get_file_list(x_list_file_t & xlst_files, x_uint32_t xut_max_files);
 
     // internal invoking
 private:

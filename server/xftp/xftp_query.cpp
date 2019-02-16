@@ -151,7 +151,7 @@ x_int32_t x_ftp_query_t::iocmd_flist(x_uint16_t xut_seqn, x_uchar_t * xct_dptr, 
         //======================================
         // 文件列表
 
-        std::list< std::string > xlst_filenames;
+        x_ftp_server_t::x_list_file_t xlst_filenames;
         x_ftp_server_t::instance().get_file_list(xlst_filenames, ECV_GET_MAX_FILES);
 
         if (xlst_filenames.empty())
@@ -164,12 +164,13 @@ x_int32_t x_ftp_query_t::iocmd_flist(x_uint16_t xut_seqn, x_uchar_t * xct_dptr, 
         // 构造应答操作的 Json 字符串
 
         Json::Value j_list(Json::ValueType::arrayValue);
-        for (std::list< std::string >::iterator itlst = xlst_filenames.begin();
+        for (x_ftp_server_t::x_list_file_t::iterator itlst = xlst_filenames.begin();
              itlst != xlst_filenames.end();
              ++itlst)
         {
             Json::Value j_file;
-            j_file["file"] = *itlst;
+            j_file["file"] = itlst->first;
+            j_file["size"] = itlst->second;
 
             j_list.append(j_file);
         }
