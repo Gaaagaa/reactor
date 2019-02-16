@@ -22,6 +22,9 @@
 
 #include "xcomm.h"
 #include "xftp_query.h"
+#include "xftp_server.h"
+
+#include <json/value.h>
 
 ////////////////////////////////////////////////////////////////////////////////
 // x_ftp_query_t
@@ -143,6 +146,56 @@ x_int32_t x_ftp_query_t::iocmd_hbeat(x_uint16_t xut_seqn, x_uchar_t * xct_dptr, 
  */
 x_int32_t x_ftp_query_t::iocmd_flist(x_uint16_t xut_seqn, x_uchar_t * xct_dptr, x_uint32_t xut_size)
 {
+    do
+    {
+        //======================================
+        // 文件列表
+
+        std::list< std::string > xlst_filenames;
+        x_ftp_server_t::instance().get_file_list(xlst_filenames, ECV_GET_MAX_FILES);
+
+        if (xlst_filenames.empty())
+        {
+            LOGW("x_ftp_server_t::get_file_list(xlst_filenames, ...) return empty list!");
+            break;
+        }
+
+        //======================================
+        // 构造应答操作的 Json 字符串
+
+        Json::Value j_list(Json::ValueType::arrayValue);
+        for (std::list< std::string >::iterator itlst = xlst_filenames.begin();
+             itlst != xlst_filenames.end();
+             ++itlst)
+        {
+            Json::Value j_file;
+            j_file["file"] = *itlst;
+
+            j_list.append(j_file);
+        }
+
+        std::string xstr_jlist = j_list.toStyledString();
+        if (xstr_jlist.size() >= 0x0000FFFF)
+        {
+            LOGW("xstr_jlist.size()[%d] >= 0x0000FFFF, it's too long!",
+                 (x_int32_t)xstr_jlist.size());
+            xstr_jlist = "";
+        }
+
+        //======================================
+        // 投递应答信息
+
+        x_io_msgctxt_t xio_msgctxt;
+        xio_msgctxt.io_seqn = xut_seqn;
+        xio_msgctxt.io_cmid = CMID_QUERY_FLIST;
+        xio_msgctxt.io_size = (x_uint32_t)xstr_jlist.size();
+        xio_msgctxt.io_dptr = (x_uchar_t *)const_cast< x_char_t * >(xstr_jlist.c_str());
+
+        post_res_xmsg(xio_msgctxt);
+
+        //======================================
+
+    } while (0);
 
     return 0;
 }

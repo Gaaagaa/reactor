@@ -29,14 +29,12 @@
 #include "xftp_echo.h"
 #include "xftp_query.h"
 
+#include <unistd.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
 ////////////////////////////////////////////////////////////////////////////////
-// x_ftp_server_t
-
-//====================================================================
-
-// 
-// x_ftp_server_t : common invoking
-// 
 
 using x_workconf_t = x_tcp_io_server_t::x_workconf_t;
 
@@ -45,6 +43,71 @@ static x_workconf_t _S_xwct_config;
 
 /** 用于监听操作的套接字 */
 static x_sockfd_t _S_xfdt_listen = X_INVALID_SOCKFD;
+
+/** 文件存储的目录 */
+static x_char_t _S_xszt_files_dir[TEXT_LEN_PATH] = { 0 };
+
+/**********************************************************/
+/**
+ * @brief 初始化工作的文件存储目录。
+ */
+static x_int32_t init_files_dir(void)
+{
+    x_config_t & xconfig = x_config_t::instance();
+
+    xconfig.read_str("xftp", "file_dir", _S_xszt_files_dir, TEXT_LEN_PATH, "");
+
+    // 不能为空
+    x_int32_t xit_len = (x_int32_t)strlen(_S_xszt_files_dir);
+    if (xit_len <= 0)
+    {
+        STD_TRACE("file_dir is empty!");
+        return -1;
+    }
+
+    // 判断是否为目录
+    struct stat xstat_buf;
+    if (0 != stat(_S_xszt_files_dir, &xstat_buf))
+    {
+        STD_TRACE("stat(_S_xszt_files_dir[%s], &xstat_buf) error : %d",
+                  _S_xszt_files_dir, errno);
+        return ((0 == errno) ? -1 : errno);
+    }
+
+    if (!S_ISDIR(xstat_buf.st_mode))
+    {
+        STD_TRACE("_S_xszt_files_dir[%s] is not a directory!", _S_xszt_files_dir);
+        return -1;
+    }
+
+    // 确认字符串为 "/" 结尾
+    if ('/' != _S_xszt_files_dir[xit_len - 1])
+    {
+        if ('\\' == _S_xszt_files_dir[xit_len - 1])
+            _S_xszt_files_dir[xit_len - 1] = '/';
+        else
+            _S_xszt_files_dir[xit_len] = '/';
+    }
+
+    // 具备 读写 访问权限
+    if (0 != access(_S_xszt_files_dir, R_OK | W_OK))
+    {
+        STD_TRACE("access(_S_xszt_files_dir[%s], R_OK | W_OK) error : %d",
+                  _S_xszt_files_dir, errno);
+        return ((0 == errno) ? -1 : errno);
+    }
+
+    return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// x_ftp_server_t
+
+//====================================================================
+
+// 
+// x_ftp_server_t : common invoking
+// 
 
 /**********************************************************/
 /**
@@ -58,6 +121,8 @@ static x_sockfd_t _S_xfdt_listen = X_INVALID_SOCKFD;
  */
 x_int32_t x_ftp_server_t::init_extra_callback(x_handle_t xht_context)
 {
+    x_int32_t xit_error = 0;
+
     //======================================
     // 读取相关配置参数
 
@@ -73,6 +138,15 @@ x_int32_t x_ftp_server_t::init_extra_callback(x_handle_t xht_context)
     _S_xwct_config.xut_tmout_mverify    = xconfig.read_int("server", "tmout_mverify"   , 4 * 60 * 1000);
 
     //======================================
+    // 文件存储的目录
+
+    xit_error = init_files_dir();
+    if (0 != xit_error)
+    {
+        return xit_error;
+    }
+
+    //======================================
     // 创建程序用于监听操作的套接字
 
     _S_xfdt_listen = create_and_bind_sockfd(_S_xwct_config.xszt_host, _S_xwct_config.xut_port);
@@ -83,7 +157,7 @@ x_int32_t x_ftp_server_t::init_extra_callback(x_handle_t xht_context)
 
     //======================================
 
-    return 0;
+    return xit_error;
 }
 
 /**********************************************************/
@@ -230,6 +304,94 @@ x_bool_t x_ftp_server_t::register_iotype(x_uint16_t xut_iotype, x_func_create_t 
 x_void_t x_ftp_server_t::unregister_iotype(x_uint16_t xut_iotype)
 {
     m_xmap_fcreate.erase(xut_iotype);
+}
+
+/**********************************************************/
+/**
+ * @brief 获取文件列表。
+ * 
+ * @param [out] xlst_files    : 操作成功返回的文件列表。
+ * @param [in ] xut_max_files : 获取文件的最大数量。
+ * 
+ * @return x_int32_t
+ *         - 成功，返回 0；
+ *         - 失败，返回 错误码。
+ */
+x_int32_t x_ftp_server_t::get_file_list(std::list< std::string > & xlst_files,
+                                        x_uint32_t xut_max_files)
+{
+    struct stat     xstat_buf;
+    struct dirent * xdirent_ptr = X_NULL;
+    x_uint32_t      xut_count   = 0;
+
+    if (xut_max_files <= 0)
+    {
+        return 0;
+    }
+
+    // 打开目录
+    DIR * xdir_ptr = opendir(_S_xszt_files_dir);
+    if (X_NULL == xdir_ptr)
+    {
+        LOGE("opendir(_S_xszt_files_dir[%s]) return X_NULL, errno : %d",
+             _S_xszt_files_dir, errno);
+        return ((0 == errno) ? -1 : errno);
+    }
+
+    while (X_NULL != (xdirent_ptr = readdir(xdir_ptr)))
+    {
+        //======================================
+        // 文件路径
+
+        std::string xstr_filename;
+        xstr_filename  = _S_xszt_files_dir;
+        xstr_filename += xdirent_ptr->d_name;
+
+        //======================================
+        // 只获取 常规文件，且具备 可读写 权限
+
+        if (0 != stat(xstr_filename.c_str(), &xstat_buf))
+        {
+            LOGE("stat(xstr_filename.c_str()[%s], ...) errno : %d",
+                 xstr_filename.c_str(), errno);
+            continue;
+        }
+
+        if (!S_ISREG(xstat_buf.st_mode))
+        {
+            continue;
+        }
+
+        if (0 != access(xstr_filename.c_str(), R_OK | W_OK))
+        {
+            LOGE("access(xstr_filename.c_str()[%s], ...) errno : %d",
+                 xstr_filename.c_str(), errno);
+            continue;
+        }
+
+        //======================================
+
+        xstr_filename = xdirent_ptr->d_name;
+        if (!xstr_filename.empty())
+        {
+            xlst_files.push_back(xstr_filename);
+        }
+
+        if (++xut_count >= xut_max_files)
+        {
+            break;
+        }
+
+        //======================================
+    }
+
+    if (X_NULL != xdir_ptr)
+    {
+        closedir(xdir_ptr);
+        xdir_ptr = X_NULL;
+    }
+
+    return 0;
 }
 
 //====================================================================

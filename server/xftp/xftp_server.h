@@ -141,6 +141,19 @@ public:
      */
     x_void_t unregister_iotype(x_uint16_t xut_iotype);
 
+    /**********************************************************/
+    /**
+     * @brief 获取文件列表。
+     * 
+     * @param [out] xlst_files    : 操作成功返回的文件列表。
+     * @param [in ] xut_max_files : 获取文件的最大数量。
+     * 
+     * @return x_int32_t
+     *         - 成功，返回 0；
+     *         - 失败，返回 错误码。
+     */
+    x_int32_t get_file_list(std::list< std::string > & xlst_files, x_uint32_t xut_max_files);
+
     // internal invoking
 private:
     /**********************************************************/

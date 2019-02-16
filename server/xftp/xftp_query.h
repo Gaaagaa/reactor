@@ -45,6 +45,8 @@ public:
     typedef enum emConstValue
     {
         ECV_CONNECTION_TYPE  = 0x0020,  ///< 业务层工作对象的连接类型
+
+        ECV_GET_MAX_FILES = 100,  ///< 获取文件列表的最大文件数量
     } emConstValue;
 
     /**
