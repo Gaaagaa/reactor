@@ -126,7 +126,7 @@ protected:
      * 
      * @return x_int32_t
      *         - 返回 0，表示对象持续有效；
-     *         - 返回 其他值（错误码），表示对象失效。
+     *         - 返回 其他值（错误码），表示对象失效（之后对象将会转入等待销毁的状态）。
      */
     virtual x_int32_t io_event_runtime_verify(void);
 
@@ -134,13 +134,19 @@ protected:
     /**
      * @brief 处理 “接收 IO 请求消息” 的事件（重载该接口，实现具体业务功能）。
      */
-    virtual x_int32_t io_event_recved_xmsg(x_tcp_io_message_t & xio_message);
+    virtual x_int32_t io_event_requested(x_tcp_io_message_t & xio_message);
 
     /**********************************************************/
     /**
      * @brief 处理 “完成 IO 应答消息” 的事件（可重载该接口，实现具体的完成通知工作）。
      */
-    virtual x_int32_t io_event_sended_xmsg(x_tcp_io_message_t & xio_message);
+    virtual x_int32_t io_event_responsed(x_tcp_io_message_t & xio_message);
+
+    /**********************************************************/
+    /**
+     * @brief 处理 “IO 通道对象被销毁” 的事件（可重载该接口，处理相关资源释放/清理工作）。
+     */
+    virtual x_int32_t io_event_destroyed(void);
 
     // public interfaces
 public:

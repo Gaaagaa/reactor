@@ -333,6 +333,7 @@ x_int32_t x_tcp_io_task_t::handle_destroy(void)
 {
     if (nullptr != m_xio_csptr)
     {
+        m_xio_csptr->io_event_destroyed();
         m_xio_csptr->cleanup();
         m_xio_csptr.reset();
     }

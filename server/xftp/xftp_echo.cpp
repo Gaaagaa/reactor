@@ -53,7 +53,7 @@ x_ftp_echo_t::~x_ftp_echo_t(void)
 /**
  * @brief 处理 “接收 IO 请求消息” 的事件。
  */
-x_int32_t x_ftp_echo_t::io_event_recved_xmsg(x_tcp_io_message_t & xio_message)
+x_int32_t x_ftp_echo_t::io_event_requested(x_tcp_io_message_t & xio_message)
 {
     x_int32_t xit_error = 0;
 
@@ -78,7 +78,16 @@ x_int32_t x_ftp_echo_t::io_event_recved_xmsg(x_tcp_io_message_t & xio_message)
 /**
  * @brief 处理 “完成 IO 应答消息” 的事件。
  */
-x_int32_t x_ftp_echo_t::io_event_sended_xmsg(x_tcp_io_message_t & xio_message)
+x_int32_t x_ftp_echo_t::io_event_responsed(x_tcp_io_message_t & xio_message)
+{
+    return 0;
+}
+
+/**********************************************************/
+/**
+ * @brief 处理 “IO 通道对象被销毁” 的事件。
+ */
+x_int32_t x_ftp_echo_t::io_event_destroyed(void)
 {
     return 0;
 }

@@ -102,7 +102,7 @@ x_int32_t x_tcp_io_channel_t::pull_res_xmsg(x_tcp_io_message_t & xio_message)
  * 
  * @return x_int32_t
  *         - 返回 0，表示对象持续有效；
- *         - 返回 其他值（错误码），表示对象失效。
+ *         - 返回 其他值（错误码），表示对象失效（之后对象将会转入等待销毁的状态）。
  */
 x_int32_t x_tcp_io_channel_t::io_event_runtime_verify(void)
 {
@@ -113,7 +113,7 @@ x_int32_t x_tcp_io_channel_t::io_event_runtime_verify(void)
 /**
  * @brief 处理 “接收 IO 请求消息” 的事件（重载该接口，实现具体业务功能）。
  */
-x_int32_t x_tcp_io_channel_t::io_event_recved_xmsg(x_tcp_io_message_t & xio_message)
+x_int32_t x_tcp_io_channel_t::io_event_requested(x_tcp_io_message_t & xio_message)
 {
     return 0;
 }
@@ -122,7 +122,16 @@ x_int32_t x_tcp_io_channel_t::io_event_recved_xmsg(x_tcp_io_message_t & xio_mess
 /**
  * @brief 处理 “完成 IO 应答消息” 的事件（可重载该接口，实现具体的完成通知工作）。
  */
-x_int32_t x_tcp_io_channel_t::io_event_sended_xmsg(x_tcp_io_message_t & xio_message)
+x_int32_t x_tcp_io_channel_t::io_event_responsed(x_tcp_io_message_t & xio_message)
+{
+    return 0;
+}
+
+/**********************************************************/
+/**
+ * @brief 处理 “IO 通道对象被销毁” 的事件（可重载该接口，处理相关资源释放/清理工作）。
+ */
+x_int32_t x_tcp_io_channel_t::io_event_destroyed(void)
 {
     return 0;
 }
@@ -309,10 +318,10 @@ x_int32_t x_tcp_io_channel_t::req_xmsg_pump(x_int32_t & xit_rmsgs)
 
         xit_count += 1;
 
-        xit_error = io_event_recved_xmsg(xio_message);
+        xit_error = io_event_requested(xio_message);
         if (0 != xit_error)
         {
-            LOGE("io_event_recved_xmsg(xio_message) return error : %d", xit_error);
+            LOGE("io_event_requested(xio_message) return error : %d", xit_error);
             break;
         }
 
@@ -392,10 +401,10 @@ x_int32_t x_tcp_io_channel_t::res_xmsg_writing(x_int32_t & xit_wmsgs)
 
         xit_count += 1;
 
-        xit_error = io_event_sended_xmsg(m_xmsg_writing);
+        xit_error = io_event_responsed(m_xmsg_writing);
         if (0 != xit_error)
         {
-            LOGE("io_event_sended_xmsg(m_xmsg_writing) return error : %d", xit_error);
+            LOGE("io_event_responsed(m_xmsg_writing) return error : %d", xit_error);
             break;
         }
 
