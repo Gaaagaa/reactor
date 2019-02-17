@@ -43,6 +43,7 @@ public:
     using x_object_t     = _Ty;
     using x_object_ptr_t = x_object_t *;
     using x_allocator_t  = _Alloc;
+    using x_opsize_t     = size_t;
 
 private:
     using x_locker_t     = std::mutex;
@@ -53,6 +54,7 @@ private:
     // constructor/destructor
 public:
     x_objectpool_t(void)
+        : m_que_size(0)
     {
 
     }
@@ -103,6 +105,7 @@ public:
 
             x_allocator_t::destroy(xobj_ptr);
             m_que_recyc.push_back(xobj_ptr);
+            m_que_size += 1;
 
             return true;
         }
@@ -114,9 +117,9 @@ public:
     /**
      * @brief 返回对象池缓存的对象数量。
      */
-    inline size_t size(void) const
+    inline x_opsize_t size(void) const
     {
-        return m_que_recyc.size();
+        return m_que_size;
     }
 
     /**********************************************************/
@@ -144,6 +147,7 @@ public:
         }
 
         m_que_recyc.clear();
+        m_que_size = 0;
 
         //======================================
     }
@@ -168,6 +172,7 @@ private:
         {
             xobj_ptr = m_que_recyc.front();
             m_que_recyc.pop_front();
+            m_que_size -= 1;
         }
 
         return xobj_ptr;
@@ -176,7 +181,10 @@ private:
     // data members
 protected:
     x_locker_t     m_sync_lock;  ///< 数据同步锁
-    x_obj_queue_t  m_que_recyc;  ///< 回收的对象集合
+    x_obj_queue_t  m_que_recyc;  ///< 回收的对象的存储队列
+
+    // 鉴于某些低版本的 stl 在实现 size() 接口上不理想，所以增加该成员变量记录队列大小
+    x_opsize_t     m_que_size;   ///< 存储队列大小
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -431,8 +439,8 @@ private:
     // data members
 protected:
     x_locker_t     m_sync_lock;  ///< 数据同步锁
-    x_obj_queue_t  m_que_alloc;  ///< 所申请的对象集合
-    x_obj_queue_t  m_que_recyc;  ///< 回收的对象集合
+    x_obj_queue_t  m_que_alloc;  ///< 所申请的对象的存储队列
+    x_obj_queue_t  m_que_recyc;  ///< 回收的对象队列
 };
 
 ////////////////////////////////////////////////////////////////////////////////

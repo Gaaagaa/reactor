@@ -156,17 +156,18 @@ x_int32_t x_msg_publisher_t::msg_dispatch(x_uint32_t xut_max_count /*= 0xFFFFFFF
         return 0;
     }
 
-    x_uint32_t xut_count = 0;
+    x_uint32_t xut_count = queue_size();
 
     // 限制分派次数为当前消息队列大小，
     // 防止消息分派过程中，发布新的消息，
     // 导致无休止的执行消息投递操作
-    if (xut_max_count > queue_size())
+    if (xut_max_count > xut_count)
     {
-        xut_max_count = queue_size();
+        xut_max_count = xut_count;
     }
 
-    while (m_xmsg_queue.size() > 0)
+    xut_count = 0;
+    while (!m_xmsg_queue.empty())
     {
         // 消息分派
         if (msg_dispatch_proc())
@@ -286,31 +287,28 @@ x_int32_t x_msg_publisher_t::post_msg(x_msgctxt_t * xmsg_ptr)
         return -1;
     }
 
-    // 若消息队列达到上限，则主动丢弃早期投递进来的消息，避免消息队列膨胀
-    if (m_xmsg_queue.size() > m_xut_max_qsize)
-    {
-        xmsg_ptr = X_NULL;
-
-        // 从队列中提取要分派的消息对象
-        {
-            x_autolock_t xautolock(m_xlock_queue);
-            xmsg_ptr = m_xmsg_queue.front();
-            m_xmsg_queue.pop();
-        }
-
-        if (X_NULL != xmsg_ptr)
-        {
-            // 回收消息对象
-            recyc_msg(xmsg_ptr);
-
-            // 递增消息丢弃计数值
-            m_xut_discards += 1;
-        }
-    }
-
-    // 将消息对象放入投递队列中
     {
         x_autolock_t xautolock(m_xlock_queue);
+
+        // 若消息队列达到上限，则主动丢弃早期投递进来的消息，避免消息队列膨胀
+        if (m_xmsg_queue.size() > m_xut_max_qsize)
+        {
+            // 从队列中提取要分派的消息对象
+            x_msgctxt_t * xmsg_rptr = m_xmsg_queue.front();
+            m_xmsg_queue.pop();
+
+            if (X_NULL != xmsg_rptr)
+            {
+                // 回收消息对象
+                recyc_msg(xmsg_rptr);
+                xmsg_rptr = X_NULL;
+
+                // 递增消息丢弃计数值
+                m_xut_discards += 1;
+            }
+        }
+
+        // 将消息对象放入投递队列中
         m_xmsg_queue.push(xmsg_ptr);
         m_xmq_notify.notify_one();
     }
@@ -374,7 +372,7 @@ x_void_t x_msg_publisher_t::cleanup(void)
 {
     {
         x_autolock_t xautolock(m_xlock_queue);
-        while (m_xmsg_queue.size() > 0)
+        while (!m_xmsg_queue.empty())
         {
             recyc_msg(m_xmsg_queue.front());
             m_xmsg_queue.pop();
@@ -437,7 +435,7 @@ x_bool_t x_msg_publisher_t::msg_dispatch_proc(void)
     // 从队列中读取操作的消息对象
     {
         x_autolock_t xautolock(m_xlock_queue);
-        if (m_xmsg_queue.size() > 0)
+        if (!m_xmsg_queue.empty())
         {
             xmsg_ptr = m_xmsg_queue.front();
             m_xmsg_queue.pop();

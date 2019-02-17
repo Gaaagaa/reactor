@@ -147,9 +147,9 @@ x_int32_t x_ftp_server_t::init_extra_callback(x_handle_t xht_context)
     }
 
     //======================================
-    // 创建程序用于监听操作的套接字
+    // 创建程序监听操作的套接字
 
-    _S_xfdt_listen = create_and_bind_sockfd(_S_xwct_config.xszt_host, _S_xwct_config.xut_port);
+    _S_xfdt_listen = create_listen_sockfd(_S_xwct_config.xszt_host, _S_xwct_config.xut_port);
     if (X_INVALID_SOCKFD == _S_xfdt_listen)
     {
         return ((0 == errno) ? -1 : errno);

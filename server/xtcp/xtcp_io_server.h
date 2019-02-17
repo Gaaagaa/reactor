@@ -100,6 +100,19 @@ public:
      */
     static x_sockfd_t create_and_bind_sockfd(x_cstring_t xszt_host, x_uint16_t xwt_port);
 
+    /**********************************************************/
+    /**
+     * @brief 创建 TCP 的监听套接字。
+     * 
+     * @param [in ] xszt_host : 指定监听的地址（四段式 IP 地址，为 X_NULL 时，将使用 INADDR_ANY）。
+     * @param [in ] xwt_port  : 指定监听的端口号。
+     * 
+     * @return x_sockfd_t
+     *         - 成功，返回 套接字的文件描述符；
+     *         - 失败，返回 X_INVALID_SOCKFD。
+     */
+    static x_sockfd_t create_listen_sockfd(x_cstring_t xszt_host, x_uint16_t xwt_port);
+
 private:
     /**********************************************************/
     /**
@@ -129,7 +142,7 @@ public:
      * @brief 启动 TCP 网络服务工作的管理模块。
      * 
      * @param [in ] xwct_config : 工作配置参数。
-     * @param [in ] xfdt_listen : 要监听的套接字。
+     * @param [in ] xfdt_listen : 要监听的套接字（若为 X_INVALID_SOCKFD 时，则使用 xwct_config 中的参数创建）。
      * 
      * @return x_int32_t
      *         - 成功，返回 0；
@@ -266,19 +279,6 @@ protected:
      *         - 失败，返回 错误码。
      */
     x_int32_t set_non_block(x_sockfd_t xfdt_sockfd);
-
-    /**********************************************************/
-    /**
-     * @brief 创建 TCP 的监听套接字。
-     * 
-     * @param [in ] xszt_host : 指定监听的地址（四段式 IP 地址，为 X_NULL 时，将使用 INADDR_ANY）。
-     * @param [in ] xwt_port  : 指定监听的端口号。
-     * 
-     * @return x_sockfd_t
-     *         - 成功，返回 套接字的文件描述符；
-     *         - 失败，返回 X_INVALID_SOCKFD。
-     */
-    x_sockfd_t create_listen_sockfd(x_cstring_t xszt_host, x_uint16_t xwt_port);
 
 private:
     /**********************************************************/

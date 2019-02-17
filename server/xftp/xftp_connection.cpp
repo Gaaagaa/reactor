@@ -46,6 +46,8 @@
 x_uint32_t x_ftp_channel_t::xmsg_split(x_tcp_io_message_t & xio_message,
                                        std::list< x_tcp_io_message_t > & xlst_iomsg)
 {
+    x_uint32_t  xut_count = 0;
+
     x_uchar_t * xct_dptr = xio_message.data();
     x_uint32_t  xut_dlen = xio_message.rlen();
     x_int32_t   xit_vpos = -1;
@@ -66,6 +68,7 @@ x_uint32_t x_ftp_channel_t::xmsg_split(x_tcp_io_message_t & xio_message,
         xlst_iomsg.push_back(
             std::forward< x_tcp_io_message_t >(
                 x_tcp_io_message_t(xct_dptr + xit_vpos, IO_HDSIZE + xio_msgctxt.io_size)));
+        xut_count += 1;
 
         xit_vlen = xit_vpos + IO_HDSIZE + xio_msgctxt.io_size;
         xct_dptr = xct_dptr + xit_vlen;
@@ -86,7 +89,7 @@ x_uint32_t x_ftp_channel_t::xmsg_split(x_tcp_io_message_t & xio_message,
         }
     }
 
-    return (x_uint32_t)xlst_iomsg.size();
+    return xut_count;
 }
 
 //====================================================================
@@ -124,6 +127,7 @@ x_ftp_channel_t::~x_ftp_channel_t(void)
  */
 x_int32_t x_ftp_channel_t::post_req_xmsg(x_tcp_io_message_t & xio_message)
 {
+    x_int32_t xit_count = 0;
     std::list< x_tcp_io_message_t > xlst_iomsg;
 
     //======================================
@@ -144,7 +148,8 @@ x_int32_t x_ftp_channel_t::post_req_xmsg(x_tcp_io_message_t & xio_message)
     //======================================
     // 分包操作
 
-    if (xmsg_split(xio_message, xlst_iomsg) <= 0)
+    xit_count = xmsg_split(xio_message, xlst_iomsg);
+    if (xit_count <= 0)
     {
         // 若 IO 消息总长度达到上限值（64KB），
         // 仍未能分包，则判断为 非法数据包
@@ -173,7 +178,7 @@ x_int32_t x_ftp_channel_t::post_req_xmsg(x_tcp_io_message_t & xio_message)
 
     //======================================
 
-    return (x_int32_t)xlst_iomsg.size();
+    return xit_count;
 }
 
 //====================================================================

@@ -89,11 +89,11 @@ x_sockfd_t x_tcp_io_server_t::create_and_bind_sockfd(x_cstring_t xszt_host, x_ui
             break;
         }
 
-        // 设置端口重用选项
+        // 设置地址重用选项
         xit_option = 1;
         xit_error = setsockopt(xfdt_sockfd,
                                SOL_SOCKET,
-                               SO_REUSEPORT,
+                               SO_REUSEADDR,
                                (const void *)&xit_option,
                                sizeof(x_int32_t));
         if (0 != xit_error)
@@ -114,6 +114,63 @@ x_sockfd_t x_tcp_io_server_t::create_and_bind_sockfd(x_cstring_t xszt_host, x_ui
     }
 
     return xfdt_sockfd;
+}
+
+/**********************************************************/
+/**
+ * @brief 创建 TCP 的监听套接字。
+ * 
+ * @param [in ] xszt_host : 指定监听的地址（四段式 IP 地址，为 X_NULL 时，将使用 INADDR_ANY）。
+ * @param [in ] xwt_port  : 指定监听的端口号。
+ * 
+ * @return x_sockfd_t
+ *         - 成功，返回 套接字的文件描述符；
+ *         - 失败，返回 X_INVALID_SOCKFD。
+ */
+x_sockfd_t x_tcp_io_server_t::create_listen_sockfd(x_cstring_t xszt_host, x_uint16_t xwt_port)
+{
+    x_int32_t  xit_error   = -1;
+    x_sockfd_t xfdt_listen = X_INVALID_SOCKFD;
+
+    do
+    {
+        //======================================
+
+        // 创建套接字
+        xfdt_listen = create_and_bind_sockfd(xszt_host, xwt_port);
+        if (X_INVALID_SOCKFD == xfdt_listen)
+        {
+            xit_error = -1;
+            LOGE("create_and_bind_sockfd(xszt_host[%s], xwt_port[%d]) return X_INVALID_SOCKFD", \
+                 ((X_NULL != xszt_host) && ('\0' != xszt_host[0])) ? xszt_host : "", xwt_port);
+            break;
+        }
+
+        //======================================
+        // 设置监听模式
+
+        xit_error = listen(xfdt_listen, SOMAXCONN);
+        if (0 != xit_error)
+        {
+            LOGE("listen(xfdt_listen[%s:%d], SOMAXCONN) return xit_error[%d], last error : %d",
+                 sockfd_local_ip(xfdt_listen, LOG_BUF(64), 64),
+                 sockfd_local_port(xfdt_listen),
+                 xit_error,
+                 errno);
+            break;
+        }
+
+        //======================================
+        xit_error = 0;
+    } while (0);
+
+    if ((0 != xit_error) && (X_INVALID_SOCKFD != xfdt_listen))
+    {
+        sockfd_close(xfdt_listen);
+        xfdt_listen = X_INVALID_SOCKFD;
+    }
+
+    return xfdt_listen;
 }
 
 /**********************************************************/
@@ -163,7 +220,7 @@ x_tcp_io_server_t::~x_tcp_io_server_t(void)
  * @brief 启动 TCP 网络服务工作的管理模块。
  * 
  * @param [in ] xwct_config : 工作配置参数。
- * @param [in ] xfdt_listen : 要监听的套接字。
+ * @param [in ] xfdt_listen : 要监听的套接字（若为 X_INVALID_SOCKFD 时，则使用 xwct_config 中的参数创建）。
  * 
  * @return x_int32_t
  *         - 成功，返回 0；
@@ -208,17 +265,6 @@ x_int32_t x_tcp_io_server_t::startup(const x_workconf_t & xwct_config, x_sockfd_
         // 设置监听套接字
         if (X_INVALID_SOCKFD != xfdt_listen)
         {
-            xit_error = listen(xfdt_listen, SOMAXCONN);
-            if (0 != xit_error)
-            {
-                LOGE("listen(xfdt_listen[%s:%d], SOMAXCONN) return xit_error[%d], last error : %d",
-                     sockfd_local_ip(xfdt_listen, LOG_BUF(64), 64),
-                     sockfd_local_port(xfdt_listen),
-                     xit_error,
-                     errno);
-                break;
-            }
-
             m_xfdt_listen = xfdt_listen;
         }
         else
@@ -543,99 +589,6 @@ x_int32_t x_tcp_io_server_t::set_non_block(x_sockfd_t xfdt_sockfd)
 
 /**********************************************************/
 /**
- * @brief 创建 TCP 的监听套接字。
- * 
- * @param [in ] xszt_host : 指定监听的地址（四段式 IP 地址，为 X_NULL 时，将使用 INADDR_ANY）。
- * @param [in ] xwt_port  : 指定监听的端口号。
- * 
- * @return x_sockfd_t
- *         - 成功，返回 套接字的文件描述符；
- *         - 失败，返回 X_INVALID_SOCKFD。
- */
-x_sockfd_t x_tcp_io_server_t::create_listen_sockfd(x_cstring_t xszt_host, x_uint16_t xwt_port)
-{
-    x_int32_t  xit_error   = -1;
-    x_sockfd_t xfdt_listen = X_INVALID_SOCKFD;
-    x_int32_t  xit_option  = 0;
-
-    struct sockaddr_in xaddr_in;
-
-    do
-    {
-        //======================================
-
-        // 创建套接字
-        xfdt_listen = socket(AF_INET, SOCK_STREAM, 0);
-        if (xfdt_listen < 0)
-        {
-            xit_error = -1;
-            LOGE("socket(AF_INET, SOCK_STREAM, 0) return get_sockfd[%d], last error : %d", \
-                 xfdt_listen, errno);
-            break;
-        }
-
-        //======================================
-        // 绑定监听的 地址 和 端口号
-
-        memset(&xaddr_in, 0, sizeof(struct sockaddr_in));
-        xaddr_in.sin_family = AF_INET;
-        xaddr_in.sin_port   = htons(xwt_port);
-        if ((X_NULL != xszt_host) && ('\0' != xszt_host[0]))
-            inet_pton(AF_INET, xszt_host, &xaddr_in.sin_addr.s_addr);
-        else
-            xaddr_in.sin_addr.s_addr = INADDR_ANY;
-
-        xit_error = bind(xfdt_listen, (struct sockaddr *)&xaddr_in, sizeof(struct sockaddr_in));
-        if (0 != xit_error)
-        {
-            LOGE("bind() failed! [host: %s, port: %d, errno: %d]", \
-                 ((X_NULL != xszt_host) ? xszt_host : "INADDR_ANY"), xwt_port, errno);
-            break;
-        }
-
-        // 设置端口重用选项
-        xit_option = 1;
-        xit_error = setsockopt(xfdt_listen,
-                               SOL_SOCKET,
-                               SO_REUSEPORT,
-                               (const void *)&xit_option,
-                               sizeof(x_int32_t));
-        if (0 != xit_error)
-        {
-            LOGE("setsockopt(xfdt_listen, SOL_SOCKET, SO_REUSEADDR, ...) return xit_error[%d], last error : %d", \
-                 xit_error, errno);
-            break;
-        }
-
-        //======================================
-        // 设置监听模式
-
-        xit_error = listen(xfdt_listen, SOMAXCONN);
-        if (0 != xit_error)
-        {
-            LOGE("listen(xfdt_listen[%s:%d], SOMAXCONN) return xit_error[%d], last error : %d",
-                 sockfd_local_ip(xfdt_listen, LOG_BUF(64), 64),
-                 sockfd_local_port(xfdt_listen),
-                 xit_error,
-                 errno);
-            break;
-        }
-
-        //======================================
-        xit_error = 0;
-    } while (0);
-
-    if ((0 != xit_error) && (X_INVALID_SOCKFD != xfdt_listen))
-    {
-        sockfd_close(xfdt_listen);
-        xfdt_listen = X_INVALID_SOCKFD;
-    }
-
-    return xfdt_listen;
-}
-
-/**********************************************************/
-/**
  * @brief 负责监听操作的工作线程的执行流程。
  */
 x_void_t x_tcp_io_server_t::thread_listen(void)
@@ -685,10 +638,11 @@ x_void_t x_tcp_io_server_t::thread_epollio(void)
 
     std::vector< struct epoll_event > xvec_events;
     xvec_events.resize(workconf().xut_epoll_waitevents);
+    x_int32_t xit_size = (x_int32_t)xvec_events.size();
 
     while (m_xbt_running)
     {
-        xit_wait = epoll_wait(m_xfdt_epollfd, xvec_events.data(), (x_int32_t)xvec_events.size(), -1);
+        xit_wait = epoll_wait(m_xfdt_epollfd, xvec_events.data(), xit_size, -1);
         if (xit_wait <= 0)
         {
             continue;

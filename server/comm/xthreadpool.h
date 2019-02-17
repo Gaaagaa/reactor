@@ -738,7 +738,8 @@ public:
         : m_enable_running(false)
         , m_xthds_capacity(0)
         , m_enable_get_task(true)
-        , m_task_count(0)
+        , m_xst_lst_tasks(0)
+        , m_xst_task_count(0)
     {
 
     }
@@ -823,7 +824,11 @@ public:
     /**
      * @brief 返回工作线程数量。
      */
-    inline size_t size(void) const { return m_lst_threads.size(); }
+    inline size_t size(void) const
+    {
+        std::lock_guard< x_locker_t > xautolock_thds(m_lock_thread);
+        return m_lst_threads.size();
+    }
 
     /**********************************************************/
     /**
@@ -833,13 +838,15 @@ public:
     {
         std::lock_guard< x_locker_t > xautolock_thds(m_lock_thread);
 
+        size_t xst_size = m_lst_threads.size();
+
         m_enable_running = (0 != xthds);
         m_xthds_capacity = xthds;
 
-        if (xthds > m_lst_threads.size())
+        if (xthds > xst_size)
         {
             // 增加工作线程数量
-            for (size_t xiter_index = m_lst_threads.size(); xiter_index < xthds; ++xiter_index)
+            for (size_t xiter_index = xst_size; xiter_index < xthds; ++xiter_index)
             {
                 m_lst_threads.push_back(
                     std::thread([this](size_t xiter_index) -> void
@@ -849,7 +856,7 @@ public:
                                 xiter_index));
             }
         }
-        else if (m_lst_threads.size() > 0)
+        else if (xst_size > 0)
         {
             // 通知所有工作线程对象，检测退出事件
             {
@@ -858,12 +865,13 @@ public:
             }
 
             // 递减工作线程数量
-            while (m_lst_threads.size() > xthds)
+            while (xst_size > xthds)
             {
                 std::thread & t = m_lst_threads.back();
                 if (t.joinable())
                     t.join();
                 m_lst_threads.pop_back();
+                xst_size -= 1;
             }
         }
     }
@@ -879,7 +887,8 @@ public:
             m_lock_smt_task.lock();
 
             m_lst_smt_tasks.push_back(xtask_ptr);
-            m_task_count.fetch_add(1);
+            m_xst_lst_tasks.fetch_add(1);
+            m_xst_task_count.fetch_add(1);
 
             m_thds_notifier.notify_one();
 
@@ -915,7 +924,7 @@ public:
     /**
      * @brief 返回任务对象数量。
      */
-    inline size_t task_count(void) const { return m_task_count; }
+    inline size_t task_count(void) const { return m_xst_task_count; }
 
     /**********************************************************/
     /**
@@ -931,12 +940,12 @@ public:
         std::lock_guard< x_locker_t > xautolock_run(m_lock_run_task);
         std::lock_guard< x_locker_t > xautolock_smt(m_lock_smt_task);
 
-        if (m_lst_smt_tasks.size() > 0)
+        if (!m_lst_smt_tasks.empty())
         {
             m_lst_run_tasks.splice(m_lst_run_tasks.end(), std::move(m_lst_smt_tasks));
         }
 
-        while (m_lst_run_tasks.size() > 0)
+        while (!m_lst_run_tasks.empty())
         {
             xtask_ptr = m_lst_run_tasks.front();
             m_lst_run_tasks.pop_front();
@@ -955,7 +964,8 @@ public:
         }
 
         m_enable_get_task = true;
-        m_task_count.store(0);
+        m_xst_lst_tasks.store(0);
+        m_xst_task_count.store(0);
     }
 
     // internal invoking
@@ -966,7 +976,7 @@ private:
      */
     inline size_t get_lst_task_size(void) const
     {
-        return (m_lst_run_tasks.size() + m_lst_smt_tasks.size());
+        return m_xst_lst_tasks;
     }
 
     /**********************************************************/
@@ -985,7 +995,7 @@ private:
 
         {
             m_lock_smt_task.lock();
-            if (m_lst_smt_tasks.size() > 0)
+            if (!m_lst_smt_tasks.empty())
             {
                 m_lst_run_tasks.splice(m_lst_run_tasks.end(), std::move(m_lst_smt_tasks));
             }
@@ -1000,6 +1010,7 @@ private:
             {
                 xtask_ptr = *itlst;
                 m_lst_run_tasks.erase(itlst);
+                m_xst_lst_tasks.fetch_sub(1);
                 break;
             }
         }
@@ -1112,27 +1123,28 @@ private:
                 xdeleter_ptr->delete_task(xtask_ptr);
             }
 
-            m_task_count.fetch_sub(1);
+            m_xst_task_count.fetch_sub(1);
         }
     }
 
     // data members
 private:
     volatile bool              m_enable_running;  ///< 工作线程继续运行的标识值
-    x_locker_t                 m_lock_thread;     ///< 工作线程对象的队列的同步操作锁
+    mutable x_locker_t         m_lock_thread;     ///< 工作线程对象的队列的同步操作锁
     volatile size_t            m_xthds_capacity;  ///< 工作线程对象的上限数量
     std::list< std::thread >   m_lst_threads;     ///< 工作线程对象的队列
 
     std::condition_variable    m_thds_notifier;   ///< 工作线程对象的通知器（条件变量）
 
-    x_locker_t                 m_lock_smt_task;   ///< 用于提交操作的任务队列的同步操作锁
+    mutable x_locker_t         m_lock_smt_task;   ///< 用于提交操作的任务队列的同步操作锁
     std::list< x_task_ptr_t >  m_lst_smt_tasks;   ///< 用于提交操作的任务队列
 
-    x_locker_t                 m_lock_run_task;   ///< 待执行的任务队列的同步操作锁
+    mutable x_locker_t         m_lock_run_task;   ///< 待执行的任务队列的同步操作锁
     std::list< x_task_ptr_t >  m_lst_run_tasks;   ///< 待执行的任务队列
 
     volatile bool              m_enable_get_task; ///< 标识当前是否可提取待执行的任务对象
-    std::atomic< size_t >      m_task_count;      ///< 任务对象计数器
+    std::atomic< size_t >      m_xst_lst_tasks;   ///< 任务队列中的对象数量
+    std::atomic< size_t >      m_xst_task_count;  ///< 任务对象总数量的计数器
 };
 
 //====================================================================
