@@ -78,6 +78,7 @@
         "memory": "cpp",
         "set": "cpp",
         "string": "cpp",
-        "ios": "cpp"
+        "ios": "cpp",
+        "xlocnum": "cpp"
     }
 }
