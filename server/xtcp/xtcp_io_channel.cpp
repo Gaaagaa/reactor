@@ -98,6 +98,35 @@ x_int32_t x_tcp_io_channel_t::pull_res_xmsg(x_tcp_io_message_t & xio_message)
 
 /**********************************************************/
 /**
+ * @brief IO 任务对象执行所参考的运行时间片（单位为 微秒）。
+ * @note 受业务层消息处理过程的影响，并不能保证 x_tcp_io_task_t 
+ *       执行的时间长度 低于 这个时间片值，所以称为 参考的时间片。
+ */
+x_uint32_t x_tcp_io_channel_t::get_io_task_time_slice(void) const
+{
+    return ECV_IO_TASK_TIME_SLICE;
+}
+
+/**********************************************************/
+/**
+ * @brief IO 消息执行 读 操作时，限制最大的数据长度。
+ */
+x_uint32_t x_tcp_io_channel_t::get_io_task_max_rlen(void) const
+{
+    return ECV_IO_TASK_MAX_RLEN;
+}
+
+/**********************************************************/
+/**
+ * @brief IO 消息执行 写 操作时，限制最大的数据长度。
+ */
+x_uint32_t x_tcp_io_channel_t::get_io_task_max_wlen(void) const
+{
+    return ECV_IO_TASK_MAX_WLEN;
+}
+
+/**********************************************************/
+/**
  * @brief 运行时的巡检操作接口（可重载该接口，实时判断对象的有效性）。
  * 
  * @return x_int32_t
@@ -239,7 +268,7 @@ x_int32_t x_tcp_io_channel_t::req_xmsg_reading(x_int32_t & xit_rmsgs)
         //======================================
         // 读取 IO 请求消息
 
-        xut_count = m_xmsg_reading.nio_read(m_xfdt_sockfd, ECV_NIO_MAX_LEN, xit_error);
+        xut_count = m_xmsg_reading.nio_read(m_xfdt_sockfd, get_io_task_max_rlen(), xit_error);
         if (0 != xit_error)
         {
             if (EAGAIN == xit_error)
@@ -295,6 +324,10 @@ x_int32_t x_tcp_io_channel_t::req_xmsg_pump(x_int32_t & xit_rmsgs)
     x_int32_t xit_error = 0;
     x_int32_t xit_count = 0;
 
+    /* 超时的时间点 */
+    std::chrono::system_clock::time_point xtm_end =
+        std::chrono::system_clock::now() + std::chrono::microseconds(get_io_task_time_slice());
+
     x_tcp_io_message_t xio_message;
 
     for (x_int32_t xit_iter = 0; xit_iter < xit_rmsgs; ++xit_iter)
@@ -326,6 +359,15 @@ x_int32_t x_tcp_io_channel_t::req_xmsg_pump(x_int32_t & xit_rmsgs)
         }
 
         //======================================
+        // 判断是否超时
+
+        if (std::chrono::system_clock::now() >= xtm_end)
+        {
+            xit_error = 0;
+            break;
+        }
+
+        //======================================
     }
 
     xit_rmsgs = xit_count;
@@ -349,6 +391,13 @@ x_int32_t x_tcp_io_channel_t::res_xmsg_writing(x_int32_t & xit_wmsgs)
     x_int32_t  xit_count = 0;
     x_uint32_t xut_bytes = 0;
 
+    /* 可写数据的最大长度 */
+    x_uint32_t xut_max_wlen = get_io_task_max_wlen();
+
+    /* 超时的时间点 */
+    std::chrono::system_clock::time_point xtm_end =
+        std::chrono::system_clock::now() + std::chrono::microseconds(get_io_task_time_slice());
+
     set_writable(X_TRUE);
 
     for (x_int32_t xit_iter = 0; xit_iter < xit_wmsgs; ++xit_iter)
@@ -371,7 +420,7 @@ x_int32_t x_tcp_io_channel_t::res_xmsg_writing(x_int32_t & xit_wmsgs)
         //======================================
         // 执行 IO 应答消息的写入操作
 
-        xut_bytes = m_xmsg_writing.nio_write(m_xfdt_sockfd, ECV_NIO_MAX_LEN, xit_error);
+        xut_bytes = m_xmsg_writing.nio_write(m_xfdt_sockfd, xut_max_wlen, xit_error);
         if (0 != xit_error)
         {
             if (EAGAIN == xit_error)
@@ -387,6 +436,8 @@ x_int32_t x_tcp_io_channel_t::res_xmsg_writing(x_int32_t & xit_wmsgs)
 
             break;
         }
+
+        xut_max_wlen -= xut_bytes;
 
         // 若 IO 应答消息，仍然处于可写入的状态，
         // 则终止完成通知，转到下次的写事件再执行写数据操作
@@ -405,6 +456,16 @@ x_int32_t x_tcp_io_channel_t::res_xmsg_writing(x_int32_t & xit_wmsgs)
         if (0 != xit_error)
         {
             LOGE("io_event_responsed(m_xmsg_writing) return error : %d", xit_error);
+            break;
+        }
+
+        //======================================
+        // 判断是否仍可继续写入数据
+
+        // 判断剩余的可写最大长度是否有效，或者操作是否超时
+        if ((xut_max_wlen <= 0) || (std::chrono::system_clock::now() >= xtm_end))
+        {
+            xit_error = 0;
             break;
         }
 

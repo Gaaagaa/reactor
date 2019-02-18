@@ -209,16 +209,6 @@ private:
 class x_tcp_io_holder_t : public x_tcp_io_handler_t
 {
     // common data types
-public:
-    /**
-     * @enum  emConstValue
-     * @brief 相关的枚举常量值。
-     */
-    typedef enum emConstValue
-    {
-        ECV_NIO_MAX_LEN   = 64 * 1024,   ///< IO 消息执行 读/写 操作时，限制最大的数据长度
-    } emConstValue;
-
 private:
     using x_io_cwptr_t = std::weak_ptr<   x_tcp_io_channel_t >;
     using x_io_csptr_t = std::shared_ptr< x_tcp_io_channel_t >;

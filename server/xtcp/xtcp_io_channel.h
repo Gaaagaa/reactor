@@ -54,7 +54,9 @@ public:
      */
     typedef enum emConstValue
     {
-        ECV_NIO_MAX_LEN   = 64 * 1024,   ///< IO 消息执行 读/写 操作时，限制最大的数据长度
+        ECV_IO_TASK_TIME_SLICE = 10 * 1000,  ///< IO 任务对象执行所参考的运行时间片，单位为 微秒（默认值）
+        ECV_IO_TASK_MAX_RLEN   = 64 * 1024,  ///< IO 消息执行 读 操作时，限制最大的数据长度
+        ECV_IO_TASK_MAX_WLEN   = 64 * 1024,  ///< IO 消息执行 写 操作时，限制最大的数据长度
     } emConstValue;
 
 protected:
@@ -117,6 +119,26 @@ protected:
      *         - 返回值 == -1，表示操作产生错误。
      */
     virtual x_int32_t pull_res_xmsg(x_tcp_io_message_t & xio_message);
+
+    /**********************************************************/
+    /**
+     * @brief IO 任务对象执行所参考的运行时间片（单位为 微秒）。
+     * @note 受业务层消息处理过程的影响，并不能保证 x_tcp_io_task_t 
+     *       执行的时间长度 低于 这个时间片值，所以称为 参考的时间片。
+     */
+    virtual x_uint32_t get_io_task_time_slice(void) const;
+
+    /**********************************************************/
+    /**
+     * @brief IO 消息执行 读 操作时，限制最大的数据长度。
+     */
+    virtual x_uint32_t get_io_task_max_rlen(void) const;
+
+    /**********************************************************/
+    /**
+     * @brief IO 消息执行 写 操作时，限制最大的数据长度。
+     */
+    virtual x_uint32_t get_io_task_max_wlen(void) const;
 
     // extensible interfaces : for the subclass of business layer
 protected:
@@ -270,6 +292,24 @@ private:
     {
         xbt_wdestroy ? (m_xut_status |=  EIO_STATUS_WDESTROY) :
                        (m_xut_status &= ~EIO_STATUS_WDESTROY);
+    }
+
+    /**********************************************************/
+    /**
+     * @brief 判断当前接收到请求的消息数据是否为空。
+     */
+    inline x_bool_t req_xmsg_is_empty(void) const
+    {
+        return (m_xmsg_reading.is_empty() && m_xmqueue_req.empty());
+    }
+
+    /**********************************************************/
+    /**
+     * @brief 判断当前需要应答的消息数据是否为空。
+     */
+    inline x_bool_t res_xmsg_is_empty(void) const
+    {
+        return (!m_xmsg_writing.is_writable() && m_xmqueue_res.empty());
     }
 
     /**********************************************************/

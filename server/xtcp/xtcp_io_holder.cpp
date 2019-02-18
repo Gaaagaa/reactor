@@ -142,19 +142,6 @@ protected:
 protected:
     /**********************************************************/
     /**
-     * @brief 执行写操作的工作流程。
-     * 
-     * @param [in ] xio_csptr : 目标操作的 IO 通道对象。
-     * @param [in ] xit_wmsgs : 可操作的 IO 消息最大数量。
-     * 
-     * @return x_int32_t
-     *         - 成功，返回 0；
-     *         - 失败，返回 错误码。
-     */
-    x_int32_t workflow_write(x_io_csptr_t & xio_csptr, x_int16_t xit_wmsgs);
-
-    /**********************************************************/
-    /**
      * @brief 初建 IO 通道对象事件 的处理流程。
      */
     x_int32_t handle_created(void);
@@ -360,72 +347,11 @@ const x_task_deleter_t * x_tcp_io_task_t::get_deleter(void) const
 
 /**********************************************************/
 /**
- * @brief 执行写操作的工作流程。
- *
- * @param [in ] xio_csptr : 目标操作的 IO 通道对象。
- * @param [in ] xit_wmsgs : 可操作的 IO 消息最大数量。
- *
- * @return x_int32_t
- *         - 成功，返回 0；
- *         - 失败，返回 错误码。
- */
-x_int32_t x_tcp_io_task_t::workflow_write(x_io_csptr_t & xio_csptr, x_int16_t xit_wmsgs)
-{
-    x_int32_t    xit_error = -1;
-    x_int32_t    xit_nmsgs = xit_wmsgs;
-    x_io_mangr_t xio_mangr = (x_io_mangr_t)xio_csptr->get_manager();
-
-    do
-    {
-        //======================================
-        // 执行 IO 消息的应答操作
-
-        xit_error = xio_csptr->res_xmsg_writing(xit_nmsgs);
-        if (0 != xit_error)
-        {
-            LOGE("xio_csptr->res_xmsg_writing(xit_nmsgs[%d, %d]) return error : %d",
-                 xit_wmsgs, xit_nmsgs, xit_error);
-            break;
-        }
-
-        //======================================
-        // 触发下次的写操作事件
-
-        // 判断是否要注册 写就绪 事件
-        if (!xio_csptr->is_writable())
-        {
-            xit_error = xio_mangr->register_pollout(xio_csptr->get_sockfd());
-            if (0 != xit_error)
-            {
-                LOGE("xio_mangr->register_pollout(xio_csptr->get_sockfd()[%d]) return error : %d",
-                     xio_csptr->get_sockfd(), xit_error);
-            }
-
-            break;
-        }
-
-        // 若应答队列仍不为空，则提交 写事件 的任务对象，
-        // 以此来触发下次的写操作事件
-        if ((xio_csptr->res_queue_size() > 0) && !xio_csptr->is_wdestroy())
-        {
-            xio_mangr->submit_io_task(taskpool().alloc(x_io_cwptr_t(xio_csptr), EIO_TASK_WRITING));
-        }
-
-        //======================================
-        xit_error = 0;
-    } while (0);
-
-    return xit_error;
-}
-
-/**********************************************************/
-/**
  * @brief 初建 IO 通道对象事件 的处理流程。
  */
 x_int32_t x_tcp_io_task_t::handle_created(void)
 {
     x_int32_t    xit_error = -1;
-    x_int32_t    xit_nmsgs = 0;
     x_io_csptr_t xio_csptr = nullptr;
     x_io_mangr_t xio_mangr = nullptr;
 
@@ -444,32 +370,21 @@ x_int32_t x_tcp_io_task_t::handle_created(void)
         XASSERT(nullptr != xio_mangr);
 
         //======================================
-        // 执行 IO 消息投递工作
+        // 判断是否有其他任务需要提交
 
-        xit_nmsgs = (x_int32_t)xio_csptr->req_queue_size();
-
-        xit_error = xio_csptr->req_xmsg_pump(xit_nmsgs);
-        if (0 != xit_error)
+        if (xio_csptr->req_queue_size() > 0)
         {
-            LOGE("[fd:%d] xio_csptr->req_xmsg_pump(xit_nmsgs[%d]) return error : %d",
-                 xio_csptr->get_sockfd(), xit_nmsgs, xit_error);
-            break;
-        }
-
-        if ((xio_csptr->req_queue_size() > 0) && !xio_csptr->is_wdestroy())
-        {
+            // 若请求消息队列不为空，则提交 EIO_TASK_MSGPUMP 任务
             xio_mangr->submit_io_task(taskpool().alloc(x_io_cwptr_t(xio_csptr), EIO_TASK_MSGPUMP));
         }
-
-        //======================================
-        // 执行 IO 应答消息的写操作流程
-
-        xit_error = workflow_write(xio_csptr, (x_int32_t)(xio_csptr->res_queue_size() + 1));
-        if (0 != xit_error)
+        else if (xio_csptr->is_writable() && !xio_csptr->res_xmsg_is_empty())
         {
-            LOGE("workflow_write(xio_csptr[fd:%d]) return error : %d",
-                 xio_csptr->get_sockfd(), xit_error);
-            break;
+            // 对于 EIO_TASK_WRITING 任务，会在 EIO_TASK_MSGPUMP 任务执行过程中判断是否有必要被提交
+            // 所以可以低一个优先级判断是否要提交 EIO_TASK_WRITING 任务
+            xio_mangr->submit_io_task(taskpool().alloc(x_io_cwptr_t(xio_csptr), EIO_TASK_WRITING));
+
+            // 切换为不可写状态，避免重复提交 EIO_TASK_WRITING 任务
+            xio_csptr->set_writable(X_FALSE);
         }
 
         //======================================
@@ -481,6 +396,7 @@ x_int32_t x_tcp_io_task_t::handle_created(void)
         xit_error = 0;
     } while (0);
 
+    // 若任务执行过程产生错误，则关闭关联的 IO 通道对象（x_tcp_io_channnel_t）
     if ((0 != xit_error) && (nullptr != xio_csptr) && (nullptr != xio_mangr))
     {
         LOGW("Invoking : xio_mangr->remove_io_holder(xio_csptr->get_sockfd()[%d])",
@@ -515,7 +431,6 @@ x_int32_t x_tcp_io_task_t::handle_reading(void)
 {
     x_int32_t    xit_error = -1;
     x_int32_t    xit_nmsgs = 0;
-    x_int32_t    xit_wmsgs = 0;
     x_io_csptr_t xio_csptr = nullptr;
     x_io_mangr_t xio_mangr = nullptr;
 
@@ -544,33 +459,28 @@ x_int32_t x_tcp_io_task_t::handle_reading(void)
             break;
         }
 
-        xit_wmsgs = xit_nmsgs;
-
         //======================================
-        // 执行 IO 消息投递工作
+        // 判断是否有其他任务需要提交
 
-        xit_error = xio_csptr->req_xmsg_pump(xit_nmsgs);
-        if (0 != xit_error)
+        if (xio_csptr->is_wdestroy())
         {
-            LOGE("[fd:%d] xio_csptr->req_xmsg_pump(xit_nmsgs[%d, %d]) return error : %d",
-                 xio_csptr->get_sockfd(), xit_wmsgs, xit_nmsgs, xit_error);
+            xit_error = 0;
             break;
         }
 
-        if ((xio_csptr->req_queue_size() > 0) && !xio_csptr->is_wdestroy())
+        if (xio_csptr->req_queue_size() > 0)
         {
+            // 若请求消息队列不为空，则提交 EIO_TASK_MSGPUMP 任务
             xio_mangr->submit_io_task(taskpool().alloc(x_io_cwptr_t(xio_csptr), EIO_TASK_MSGPUMP));
         }
-
-        //======================================
-        // 执行 IO 应答消息的写操作流程
-
-        xit_error = workflow_write(xio_csptr, xit_wmsgs);
-        if (0 != xit_error)
+        else if (xio_csptr->is_writable() && !xio_csptr->res_xmsg_is_empty())
         {
-            LOGE("workflow_write(xio_csptr[fd:%d], [%d]) return error : %d",
-                 xio_csptr->get_sockfd(), xit_wmsgs, xit_error);
-            break;
+            // 对于 EIO_TASK_WRITING 任务，会在 EIO_TASK_MSGPUMP 任务执行过程中判断是否有必要被提交
+            // 所以可以低一个优先级判断是否要提交 EIO_TASK_WRITING 任务
+            xio_mangr->submit_io_task(taskpool().alloc(x_io_cwptr_t(xio_csptr), EIO_TASK_WRITING));
+
+            // 切换为不可写状态，避免重复提交 EIO_TASK_WRITING 任务
+            xio_csptr->set_writable(X_FALSE);
         }
 
         //======================================
@@ -582,6 +492,7 @@ x_int32_t x_tcp_io_task_t::handle_reading(void)
         xit_error = 0;
     } while (0);
 
+    // 若任务执行过程产生错误，则关闭关联的 IO 通道对象（x_tcp_io_channnel_t）
     if ((0 != xit_error) && (nullptr != xio_csptr) && (nullptr != xio_mangr))
     {
         LOGW("Invoking : xio_mangr->remove_io_holder(xio_csptr->get_sockfd()[%d])",
@@ -599,6 +510,8 @@ x_int32_t x_tcp_io_task_t::handle_reading(void)
 x_int32_t x_tcp_io_task_t::handle_writing(void)
 {
     x_int32_t    xit_error = -1;
+    x_int32_t    xit_wmsgs = 0;
+    x_int32_t    xit_nmsgs = 0;
     x_io_csptr_t xio_csptr = nullptr;
     x_io_mangr_t xio_mangr = nullptr;
 
@@ -619,12 +532,49 @@ x_int32_t x_tcp_io_task_t::handle_writing(void)
         //======================================
         // 执行 IO 应答消息的写操作流程
 
-        xit_error = workflow_write(xio_csptr, (x_int32_t)(xio_csptr->res_queue_size() + 1));
+        xit_wmsgs = (x_int32_t)xio_csptr->req_queue_size() + 1;
+        xit_nmsgs = xit_wmsgs;
+
+        xit_error = xio_csptr->res_xmsg_writing(xit_nmsgs);
         if (0 != xit_error)
         {
-            LOGE("workflow_write(xio_csptr[fd:%d], [%d]) return error : %d",
-                 xio_csptr->get_sockfd(), (x_int32_t)(xio_csptr->res_queue_size() + 1), xit_error);
+            LOGE("xio_csptr->res_xmsg_writing(xit_nmsgs[%d, %d]) return error : %d",
+                 xit_wmsgs, xit_nmsgs, xit_error);
             break;
+        }
+
+        //======================================
+        // 触发下次的写操作事件
+
+        if (xio_csptr->is_wdestroy())
+        {
+            xit_error = 0;
+            break;
+        }
+
+        // 若应答队列仍不为空，则提交 写事件 的任务对象，
+        // 以此来触发下次的写操作事件
+        if (!xio_csptr->res_xmsg_is_empty())
+        {
+            if (xio_csptr->is_writable())
+            {
+                // IO 通道对象仍处于可写状态，则继续提交 EIO_TASK_WRITING 任务
+                xio_mangr->submit_io_task(taskpool().alloc(x_io_cwptr_t(xio_csptr), EIO_TASK_WRITING));
+
+                // 切换为不可写状态，避免重复提交 EIO_TASK_WRITING 任务
+                xio_csptr->set_writable(X_FALSE);
+            }
+            else
+            {
+                // IO 通道对象处于不可写状态，则注册 写就绪 事件，触发下次的 EIO_TASK_WRITING 任务
+                xit_error = xio_mangr->register_pollout(xio_csptr->get_sockfd());
+                if (0 != xit_error)
+                {
+                    LOGE("xio_mangr->register_pollout(xio_csptr->get_sockfd()[%d]) return error : %d",
+                         xio_csptr->get_sockfd(), xit_error);
+                    break;
+                }
+            }
         }
 
         //======================================
@@ -636,6 +586,7 @@ x_int32_t x_tcp_io_task_t::handle_writing(void)
         xit_error = 0;
     } while (0);
 
+    // 若任务执行过程产生错误，则关闭关联的 IO 通道对象（x_tcp_io_channnel_t）
     if ((0 != xit_error) && (nullptr != xio_csptr) && (nullptr != xio_mangr))
     {
         LOGW("Invoking : xio_mangr->remove_io_holder(xio_csptr->get_sockfd()[%d])",
@@ -686,20 +637,28 @@ x_int32_t x_tcp_io_task_t::handle_msgpump(void)
             break;
         }
 
-        if ((xio_csptr->req_queue_size() > 0) && !xio_csptr->is_wdestroy())
+        //======================================
+        // 判断是否有其他任务需要继续执行
+
+        if (xio_csptr->is_wdestroy())
+        {
+            xit_error = 0;
+            break;
+        }
+
+        // 若请求消息队列仍然不为空，则提交 EIO_TASK_MSGPUMP 任务继续进行 消息投递 的工作
+        if (xio_csptr->req_queue_size() > 0)
         {
             xio_mangr->submit_io_task(taskpool().alloc(x_io_cwptr_t(xio_csptr), EIO_TASK_MSGPUMP));
         }
 
-        //======================================
-        // 执行 IO 应答消息的写操作流程
-
-        xit_error = workflow_write(xio_csptr, (x_int32_t)(xio_csptr->res_queue_size() + 1));
-        if (0 != xit_error)
+        // 判断是否要提交 EIO_TASK_WRITING 任务
+        if (xio_csptr->is_writable() && !xio_csptr->res_xmsg_is_empty())
         {
-            LOGE("workflow_write(xio_csptr[fd:%d], [%d]) return error : %d",
-                 xio_csptr->get_sockfd(), (x_int32_t)(xio_csptr->res_queue_size() + 1), xit_error);
-            break;
+            xio_mangr->submit_io_task(taskpool().alloc(x_io_cwptr_t(xio_csptr), EIO_TASK_WRITING));
+
+            // 切换为不可写状态，避免重复提交 EIO_TASK_WRITING 任务
+            xio_csptr->set_writable(X_FALSE);
         }
 
         //======================================
@@ -711,6 +670,7 @@ x_int32_t x_tcp_io_task_t::handle_msgpump(void)
         xit_error = 0;
     } while (0);
 
+    // 若任务执行过程产生错误，则关闭关联的 IO 通道对象（x_tcp_io_channnel_t）
     if ((0 != xit_error) && (nullptr != xio_csptr) && (nullptr != xio_mangr))
     {
         LOGW("Invoking : xio_mangr->remove_io_holder(xio_csptr->get_sockfd()[%d])",
