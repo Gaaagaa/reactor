@@ -37,6 +37,7 @@ typedef enum emIoEventCallback
 {
     EIO_ECBK_ACCEPT = 0x00000100,  ///< 套接字接收连接通知
     EIO_ECBK_CREATE = 0x00000200,  ///< 建立 IO 通道对象的回调操作码（参看 x_tcp_io_create_args_t 说明）
+    EIO_ECBK_VERIFY = 0x00000300,  ///< 巡检操作码
 } emIoEventCallback;
 
 /**
@@ -227,15 +228,9 @@ public:
 
     /**********************************************************/
     /**
-     * @brief 处理 套接字定时巡检事件 的操作接口。
-     * 
-     * @param [in ] xfdt_sockfd : 触发该事件的套接字描述符。
-     * 
-     * @return x_int32_t
-     *         - 成功，返回 0；
-     *         - 失败，返回 错误码。
+     * @brief 处理 定时巡检事件 的操作接口。
      */
-    x_int32_t io_event_verify(x_sockfd_t xfdt_sockfd);
+    x_int32_t io_event_verify(void);
 
     // inner invoking
 protected:

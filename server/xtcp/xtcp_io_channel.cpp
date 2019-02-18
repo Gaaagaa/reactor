@@ -127,20 +127,12 @@ x_uint32_t x_tcp_io_channel_t::get_io_task_max_wlen(void) const
 
 /**********************************************************/
 /**
- * @brief 运行时的巡检操作接口（可重载该接口，实时判断对象的有效性）。
+ * @brief 处理 “接收 IO 请求消息” 的事件。
+ * @note  可重载该接口，实现具体业务功能。
  * 
  * @return x_int32_t
- *         - 返回 0，表示对象持续有效；
- *         - 返回 其他值（错误码），表示对象失效（之后对象将会转入等待销毁的状态）。
- */
-x_int32_t x_tcp_io_channel_t::io_event_runtime_verify(void)
-{
-    return 0;
-}
-
-/**********************************************************/
-/**
- * @brief 处理 “接收 IO 请求消息” 的事件（重载该接口，实现具体业务功能）。
+ *         - 返回 0，表示 IO 操作可持续有效；
+ *         - 返回 其他值（错误码），表示 IO 操作失效，之后将会转入等待销毁的状态。
  */
 x_int32_t x_tcp_io_channel_t::io_event_requested(x_tcp_io_message_t & xio_message)
 {
@@ -149,7 +141,12 @@ x_int32_t x_tcp_io_channel_t::io_event_requested(x_tcp_io_message_t & xio_messag
 
 /**********************************************************/
 /**
- * @brief 处理 “完成 IO 应答消息” 的事件（可重载该接口，实现具体的完成通知工作）。
+ * @brief 处理 “完成 IO 应答消息” 的事件。
+ * @note  可重载该接口，实现具体的完成通知工作。
+ * 
+ * @return x_int32_t
+ *         - 返回 0，表示 IO 操作可持续有效；
+ *         - 返回 其他值（错误码），表示 IO 操作失效，之后将会转入等待销毁的状态。
  */
 x_int32_t x_tcp_io_channel_t::io_event_responsed(x_tcp_io_message_t & xio_message)
 {
@@ -158,7 +155,27 @@ x_int32_t x_tcp_io_channel_t::io_event_responsed(x_tcp_io_message_t & xio_messag
 
 /**********************************************************/
 /**
- * @brief 处理 “IO 通道对象被销毁” 的事件（可重载该接口，处理相关资源释放/清理工作）。
+ * @brief IO 任务对象在执行过程中产生的 IO 消息错误通知。
+ * @note  可重载该接口，实现错误处理；这之后，IO 操作将失效，进而转入等待销毁的状态。
+ * 
+ * @param [in ] xio_message : 产生错误的 IO 消息对象。
+ * @param [in ] xit_etype   : 产生错误的 IO 操作类型（参看 emIoXmsgErrorType 枚举值）。
+ * @param [in ] xit_errno   : 通知的错误码。
+ * 
+ * @return x_int32_t
+ *         - 操作状态码（未使用）。
+ */
+x_int32_t x_tcp_io_channel_t::io_event_xmsgerror(x_tcp_io_message_t & xio_message,
+                                                 x_int32_t xit_etype,
+                                                 x_int32_t xit_errno)
+{
+    return 0;
+}
+
+/**********************************************************/
+/**
+ * @brief 处理 “IO 通道对象被销毁” 的事件。
+ * @note  可重载该接口，处理相关资源释放/清理工作。
  */
 x_int32_t x_tcp_io_channel_t::io_event_destroyed(void)
 {
@@ -280,6 +297,7 @@ x_int32_t x_tcp_io_channel_t::req_xmsg_reading(x_int32_t & xit_rmsgs)
             {
                 LOGE("xut_count[%d] = m_xmsg_reading.nio_read(xfdt_sockfd[%d], ...) return error : %d",
                     xut_count, m_xfdt_sockfd, xit_error);
+                io_event_xmsgerror(m_xmsg_reading, EIO_XMSG_ETYPE_READING, xit_error);
                 break;
             }
         }
@@ -432,6 +450,8 @@ x_int32_t x_tcp_io_channel_t::res_xmsg_writing(x_int32_t & xit_wmsgs)
             {
                 LOGE("xut_bytes[%d] = m_xmsg_writing.nio_write(m_xfdt_sockfd[%d], ...) return error : %d",
                      xut_bytes, m_xfdt_sockfd, xit_error);
+
+                io_event_xmsgerror(m_xmsg_writing, EIO_XMSG_ETYPE_WRITING, xit_error);
             }
 
             break;

@@ -71,7 +71,7 @@ public:
     {
         ECV_TIMEOUT_KPALIVE = 8 * 60 * 1000,   ///< 检测存活的最大超时时间（单位 毫秒）
         ECV_TIMEOUT_BALEFUL = 4 * 60 * 1000,   ///< 检测恶意的最大超时时间（单位 毫秒）
-        ECV_TIMEOUT_MVERIFY = 4 * 60 * 1000,   ///< 定时巡检的最大超时时间（单位 毫秒）
+        ECV_TIMEOUT_MVERIFY = 4 * 60 * 1000,   ///< 定时巡检的最小超时时间（单位 毫秒）
         ECV_TMSTAMP_MAXPLUS = 100000,          ///< 时间戳最大微调值
     } emConstValue;
 
@@ -267,12 +267,6 @@ private:
 
     /**********************************************************/
     /**
-     * @brief 执行定时巡检流程。
-     */
-    x_void_t verify_proc(void);
-
-    /**********************************************************/
-    /**
      * @brief 工作线程运行的入口函数。
      */
     x_void_t thread_run(void);
@@ -282,9 +276,9 @@ private:
     x_func_ioalive_t  m_xfunc_ioalive;   ///< 事件回调的函数指针
     x_handle_t        m_xht_iocontext;   ///< 事件回调的上下文句柄
 
-    x_timestamp_t  m_xut_tmout_kpalive;  ///< 检测存活的超时时间
-    x_timestamp_t  m_xut_tmout_baleful;  ///< 检测恶意连接的超时时间
-    x_timestamp_t  m_xut_tmout_mverify;  ///< 定时巡检的超时时间
+    x_timestamp_t  m_xut_tmout_kpalive;  ///< 检测存活的超时时间（时间值被校正过）
+    x_timestamp_t  m_xut_tmout_baleful;  ///< 检测恶意连接的超时时间（时间值被校正过）
+    x_timestamp_t  m_xut_tmout_mverify;  ///< 定时巡检的超时时间（单位为 毫秒）
 
     x_bool_t       m_xbt_running;  ///< 标识工作线程是否可继续运行
     x_thread_t     m_xio_thread;   ///< 工作线程对象
@@ -292,7 +286,6 @@ private:
     x_lst_event_t  m_xlst_event;   ///< 请求操作的事件队列
     x_map_ndesc_t  m_xmap_ndesc;   ///< IO 节点描述信息的映射表
     x_map_tskey_t  m_xmap_kalive;  ///< 活动（保活）时间戳 到 IO 节点索引键 的映射表
-    x_map_tskey_t  m_xmap_verify;  ///< 巡检操作时间戳 到 IO 节点索引键 的映射表
 };
 
 ////////////////////////////////////////////////////////////////////////////////

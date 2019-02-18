@@ -421,6 +421,7 @@ x_int32_t x_ftp_server_t::xio_event(x_sockfd_t xfdt_sockfd,
     {
     case EIO_ECBK_ACCEPT : xit_error = xio_event_accept(xfdt_sockfd, xht_optargs); break;
     case EIO_ECBK_CREATE : xit_error = xio_event_create(xfdt_sockfd, xht_optargs); break;
+    case EIO_ECBK_VERIFY : xit_error = xio_event_verify(xfdt_sockfd, xht_optargs); break;
 
     default:
         break;
@@ -508,4 +509,13 @@ x_int32_t x_ftp_server_t::xio_event_create(x_sockfd_t xfdt_sockfd, x_handle_t xh
     } while (0);
 
     return xit_error;
+}
+
+/**********************************************************/
+/**
+ * @brief 处理 “巡检操作” 的事件回调操作（该接口仅由 xio_event() 调用）。
+ */
+x_int32_t x_ftp_server_t::xio_event_verify(x_sockfd_t xfdt_sockfd, x_handle_t xht_optargs)
+{
+    return 0;
 }

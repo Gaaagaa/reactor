@@ -72,6 +72,16 @@ protected:
         EIO_STATUS_WDESTROY  = 0x80000000,  ///< 等待销毁
     } emIoHandleStatus;
 
+    /**
+     * @enum  emIoXmsgErrorType
+     * @brief IO 任务执行过程产生的 IO 消息错误类型枚举值。
+     */
+    typedef enum emIoXmsgErrorType
+    {
+        EIO_XMSG_ETYPE_READING = 0x00000010,  ///< 读过程产生的错误
+        EIO_XMSG_ETYPE_WRITING = 0x00000020,  ///< 写过程产生的错误
+    } emIoXmsgErrorType;
+
     using x_iomsg_t = x_tcp_io_message_t;
 
     /**
@@ -144,29 +154,46 @@ protected:
 protected:
     /**********************************************************/
     /**
-     * @brief 运行时的巡检操作接口（可重载该接口，实时判断对象的有效性）。
+     * @brief 处理 “接收 IO 请求消息” 的事件。
+     * @note  可重载该接口，实现具体业务功能。
      * 
      * @return x_int32_t
-     *         - 返回 0，表示对象持续有效；
-     *         - 返回 其他值（错误码），表示对象失效（之后对象将会转入等待销毁的状态）。
-     */
-    virtual x_int32_t io_event_runtime_verify(void);
-
-    /**********************************************************/
-    /**
-     * @brief 处理 “接收 IO 请求消息” 的事件（重载该接口，实现具体业务功能）。
+     *         - 返回 0，表示 IO 操作可持续有效；
+     *         - 返回 其他值（错误码），表示 IO 操作失效，之后将会转入等待销毁的状态。
      */
     virtual x_int32_t io_event_requested(x_tcp_io_message_t & xio_message);
 
     /**********************************************************/
     /**
-     * @brief 处理 “完成 IO 应答消息” 的事件（可重载该接口，实现具体的完成通知工作）。
+     * @brief 处理 “完成 IO 应答消息” 的事件。
+     * @note  可重载该接口，实现具体的完成通知工作。
+     * 
+     * @return x_int32_t
+     *         - 返回 0，表示 IO 操作可持续有效；
+     *         - 返回 其他值（错误码），表示 IO 操作失效，之后将会转入等待销毁的状态。
      */
     virtual x_int32_t io_event_responsed(x_tcp_io_message_t & xio_message);
 
     /**********************************************************/
     /**
-     * @brief 处理 “IO 通道对象被销毁” 的事件（可重载该接口，处理相关资源释放/清理工作）。
+     * @brief IO 任务对象在执行过程中产生的 IO 消息错误通知。
+     * @note  可重载该接口，实现错误处理；这之后，IO 操作将失效，进而转入等待销毁的状态。
+     * 
+     * @param [in ] xio_message : 产生错误的 IO 消息对象。
+     * @param [in ] xit_etype   : 产生错误的 IO 操作类型（参看 emIoXmsgErrorType 枚举值）。
+     * @param [in ] xit_errno   : 通知的错误码。
+     * 
+     * @return x_int32_t
+     *         - 操作状态码（未使用）。
+     */
+    virtual x_int32_t io_event_xmsgerror(x_tcp_io_message_t & xio_message,
+                                         x_int32_t xit_etype,
+                                         x_int32_t xit_errno);
+
+    /**********************************************************/
+    /**
+     * @brief 处理 “IO 通道对象被销毁” 的事件。
+     * @note  可重载该接口，处理相关资源释放/清理工作。
      */
     virtual x_int32_t io_event_destroyed(void);
 
