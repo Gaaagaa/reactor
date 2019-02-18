@@ -714,21 +714,10 @@ x_void_t x_tcp_io_server_t::kpalive_handle(x_sockfd_t xfdt_sockfd, x_uint32_t xu
 
     case x_kpalive_t::EIO_AEC_MVERIFY :
         {
-            xit_error = m_xio_manager.io_event_verify(xfdt_sockfd);
+            xit_error = m_xio_manager.io_event_verify();
             if (0 != xit_error)
             {
-                LOGE("[thread_index: %d] m_xio_manager.io_event_verify(xfdt_sockfd[%s:%d]) return error : %d",
-                     xit_nthread,
-                     sockfd_remote_ip(xfdt_sockfd, LOG_BUF(64), 64),
-                     sockfd_remote_port(xfdt_sockfd),
-                     xit_error);
-
-                LOGI("[thread_index: %d] io_handle_close(xfdt_sockfd[%s:%d])",
-                     xit_nthread,
-                     sockfd_remote_ip(xfdt_sockfd, LOG_BUF(64), 64),
-                     sockfd_remote_port(xfdt_sockfd));
-
-                io_handle_close(xit_nthread, xfdt_sockfd);
+                LOGE("m_xio_manager.io_event_verify() return error : %d", xit_error);
             }
         }
         break;

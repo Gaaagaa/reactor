@@ -1009,24 +1009,3 @@ x_int32_t x_tcp_io_holder_t::io_writing(x_handle_t xht_manager, x_sockfd_t xfdt_
 
     return xit_error;
 }
-
-/**********************************************************/
-/**
- * @brief 处理 巡检 事件。
- * 
- * @param [in ] xht_manager : IO 管理对象（x_tcp_io_manager_t）。
- * @param [in ] xfdt_sockfd : 目标操作的套接字描述符。
- * 
- * @return x_int32_t
- *         - 成功，返回 0；
- *         - 失败，返回 错误码。
- */
-x_int32_t x_tcp_io_holder_t::io_verify(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd)
-{
-    if (nullptr != m_xio_csptr)
-    {
-        return m_xio_csptr->io_event_runtime_verify();
-    }
-
-    return 0;
-}

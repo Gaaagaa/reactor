@@ -474,47 +474,20 @@ x_int32_t x_tcp_io_manager_t::io_event_write(x_sockfd_t xfdt_sockfd)
 
 /**********************************************************/
 /**
- * @brief 处理 套接字定时巡检事件 的操作接口。
- * 
- * @param [in ] xfdt_sockfd : 触发该事件的套接字描述符。
- * 
- * @return x_int32_t
- *         - 成功，返回 0；
- *         - 失败，返回 错误码。
+ * @brief 处理 定时巡检事件 的操作接口。
  */
-x_int32_t x_tcp_io_manager_t::io_event_verify(x_sockfd_t xfdt_sockfd)
+x_int32_t x_tcp_io_manager_t::io_event_verify(void)
 {
-    x_int32_t  xit_error   = -1;
-    x_handle_t xht_handler = X_NULL;
-
     //======================================
 
-    do
+    if (X_NULL != m_xfunc_iocbk)
     {
-        xit_error = maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd, &xht_handler, MAPTBL_TIMEOUT_INFINIT);
-        if (MAPTBL_ERR_SUCCESS != xit_error)
-        {
-            LOGE("maptbl_lock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd[%d], ...) return error : %d",
-                 xfdt_sockfd, xit_error);
-            break;
-        }
-
-        if (X_NULL != xht_handler)
-        {
-            xit_error = ((x_tcp_io_handler_t *)xht_handler)->io_verify((x_handle_t)this, xfdt_sockfd);
-            if (0 != xit_error)
-            {
-                LOGE("xht_handler->io_verify((x_handle_t)this, xfdt_sockfd[%d]) return error : %d",
-                     xfdt_sockfd, xit_error);
-            }
-        }
-
-        maptbl_unlock(m_xht_mapsockfd, (x_size_t)xfdt_sockfd);
-    } while (0);
+        m_xfunc_iocbk(X_INVALID_SOCKFD, X_NULL, EIO_ECBK_VERIFY, m_xht_cbk_ctxt);
+    }
 
     //======================================
 
-    return xit_error;
+    return 0;
 }
 
 //====================================================================

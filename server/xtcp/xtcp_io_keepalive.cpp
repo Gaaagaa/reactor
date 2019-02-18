@@ -97,7 +97,7 @@ x_int32_t x_tcp_io_keepalive_t::start(x_uint64_t xut_tmout_kpalive,
 
         m_xut_tmout_kpalive = limit_bound(xut_tmout_kpalive, 20000, ECV_TIMEOUT_KPALIVE) * ECV_TMSTAMP_MAXPLUS;
         m_xut_tmout_baleful = limit_bound(xut_tmout_baleful, 20000, ECV_TIMEOUT_BALEFUL) * ECV_TMSTAMP_MAXPLUS;
-        m_xut_tmout_mverify = limit_bound(xut_tmout_mverify, 20000, ECV_TIMEOUT_MVERIFY) * ECV_TMSTAMP_MAXPLUS;
+        m_xut_tmout_mverify = limit_lower(xut_tmout_mverify,        ECV_TIMEOUT_MVERIFY);
 
         //======================================
 
@@ -142,7 +142,6 @@ x_void_t x_tcp_io_keepalive_t::stop(void)
     m_xlst_event.clear();
     m_xmap_ndesc.clear();
     m_xmap_kalive.clear();
-    m_xmap_verify.clear();
 
     m_xlkt_lstevt.unlock();
 }
@@ -260,7 +259,6 @@ x_void_t x_tcp_io_keepalive_t::update_xmap_ndesc(void)
                 xndesc.xtms_verify = 0;
 
                 XVERIFY(insert_tskey(m_xmap_kalive, xndesc.xtms_kalive, xndesc.xkey_sockfd));
-                XVERIFY(insert_tskey(m_xmap_verify, xndesc.xtms_verify, xndesc.xkey_sockfd));
             }
             break;
 
@@ -268,7 +266,6 @@ x_void_t x_tcp_io_keepalive_t::update_xmap_ndesc(void)
             if (itfind != m_xmap_ndesc.end())
             {
                 m_xmap_kalive.erase(itfind->second.xtms_kalive);
-                m_xmap_verify.erase(itfind->second.xtms_verify);
                 m_xmap_ndesc.erase(itfind);
             }
             break;
@@ -344,69 +341,17 @@ x_void_t x_tcp_io_keepalive_t::keepalive_proc(void)
 
 /**********************************************************/
 /**
- * @brief 执行定时巡检流程。
- */
-x_void_t x_tcp_io_keepalive_t::verify_proc(void)
-{
-    x_timestamp_t xtst_now = 0;
-    x_timestamp_t xtst_end = 0;
-
-    x_map_ndesc_t::iterator itmap_ndesc;
-    x_map_tskey_t::iterator itmap_tskey;
-
-    using x_vector_keyts_t = std::vector< std::pair< x_iokeytype_t, x_timestamp_t > >;
-
-    x_vector_keyts_t xvec_update;
-
-    //======================================
-
-    for (itmap_tskey = m_xmap_verify.begin(); itmap_tskey != m_xmap_verify.end(); ++itmap_tskey)
-    {
-        itmap_ndesc = m_xmap_ndesc.find(itmap_tskey->second);
-        XVERIFY(itmap_ndesc != m_xmap_ndesc.end());
-        XASSERT(itmap_tskey->first == itmap_ndesc->second.xtms_verify);
-
-        xtst_now = redefine_time_tick();
-        xtst_end = itmap_tskey->first + m_xut_tmout_mverify;
-
-        // 未超时
-        if (xtst_end > xtst_now)
-        {
-            break;
-        }
-
-        // 回调巡检
-        if (X_NULL != m_xfunc_ioalive)
-        {
-            m_xfunc_ioalive(itmap_ndesc->second.xkey_sockfd, EIO_AEC_MVERIFY, m_xht_iocontext);
-        }
-
-        // 加入待更新操作队列
-        xvec_update.push_back(std::make_pair(itmap_tskey->second, (x_timestamp_t)get_time_tick()));
-    }
-
-    //======================================
-
-    for (x_vector_keyts_t::iterator itvec = xvec_update.begin(); itvec != xvec_update.end(); ++itvec)
-    {
-        itmap_ndesc = m_xmap_ndesc.find(itvec->first);
-        XVERIFY(itmap_ndesc != m_xmap_ndesc.end());
-
-        m_xmap_verify.erase(itmap_ndesc->second.xtms_verify);
-        XVERIFY(insert_tskey(m_xmap_verify, itvec->second, itvec->first));
-        itmap_ndesc->second.xtms_verify = itvec->second;
-    }
-
-    //======================================
-}
-
-/**********************************************************/
-/**
  * @brief 工作线程运行的入口函数。
  */
 x_void_t x_tcp_io_keepalive_t::thread_run(void)
 {
-    std::chrono::system_clock::time_point xtime_end;
+    using x_time_clock_t  = std::chrono::system_clock;
+    using x_time_point_t  = x_time_clock_t::time_point;
+    using x_millisecond_t = std::chrono::milliseconds;
+
+    x_time_point_t xtime_bgn = x_time_clock_t::now();
+    x_time_point_t xtime_end = xtime_bgn + x_millisecond_t(m_xut_tmout_mverify);
+    x_time_point_t xtime_tmp;
 
     while (m_xbt_running)
     {
@@ -418,16 +363,28 @@ x_void_t x_tcp_io_keepalive_t::thread_run(void)
         // IO 存活检测
         keepalive_proc();
 
-        // 定时巡检操作
-        verify_proc();
+        //======================================
+        // 回调巡检
+
+        if (X_NULL != m_xfunc_ioalive)
+        {
+            xtime_tmp = x_time_clock_t::now();
+            if ((xtime_tmp <= xtime_bgn) || (xtime_tmp >= xtime_end))
+            {
+                m_xfunc_ioalive(X_INVALID_SOCKFD, EIO_AEC_MVERIFY, m_xht_iocontext);
+
+                xtime_bgn = x_time_clock_t::now();
+                xtime_end = xtime_bgn + x_millisecond_t(m_xut_tmout_mverify);
+            }
+        }
 
         //======================================
-        // 暂停操作
+        // 线程暂停操作
 
-        xtime_end = std::chrono::system_clock::now() + std::chrono::milliseconds(50);
-        while (m_xbt_running && m_xlst_event.empty() && (std::chrono::system_clock::now() < xtime_end))
+        xtime_tmp = x_time_clock_t::now() + x_millisecond_t(50);
+        while (m_xbt_running && m_xlst_event.empty() && (x_time_clock_t::now() < xtime_tmp))
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::this_thread::sleep_for(x_millisecond_t(1));
         }
 
         //======================================

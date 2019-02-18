@@ -186,6 +186,12 @@ private:
      */
     x_int32_t xio_event_create(x_sockfd_t xfdt_sockfd, x_handle_t xht_optargs);
 
+    /**********************************************************/
+    /**
+     * @brief 处理 “巡检操作” 的事件回调操作（该接口仅由 xio_event() 调用）。
+     */
+    x_int32_t xio_event_verify(x_sockfd_t xfdt_sockfd, x_handle_t xht_optargs);
+
     // data members
 private:
     x_map_func_create_t    m_xmap_fcreate;   ///< 各类 业务层工作对象 的 创建接口函数 的 映射表
