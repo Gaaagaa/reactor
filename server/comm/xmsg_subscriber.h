@@ -156,7 +156,7 @@ public:
         typename x_mapfunc_t::iterator itfind = m_map_mfunc.find(xmkey);
         if (itfind != m_map_mfunc.end())
         {
-            (reinterpret_cast< _Ty * >(this)->*(itfind->second))(xargs...);
+            (static_cast< _Ty * >(this)->*(itfind->second))(xargs...);
         }
     }
 
