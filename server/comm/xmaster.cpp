@@ -729,7 +729,7 @@ x_void_t x_master_t::reset_msg_handler(void)
 /**
  * @brief 处理 退出信号 的消息。
  */
-void x_master_t::on_msg_sigquit(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
+x_void_t x_master_t::on_msg_sigquit(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
 {
     XASSERT(sizeof(x_int32_t) == xut_size);
     LOGI("on_msg_sigquit() signo : %d", *(x_int32_t *)xpvt_dptr);
@@ -742,7 +742,7 @@ void x_master_t::on_msg_sigquit(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
 /**
  * @brief 处理 工作进程结束 的消息。
  */
-void x_master_t::on_msg_sigchld(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
+x_void_t x_master_t::on_msg_sigchld(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
 {
     XASSERT(sizeof(x_ssize_t) == xut_size);
 

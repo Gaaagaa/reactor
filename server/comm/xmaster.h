@@ -207,13 +207,13 @@ protected:
     /**
      * @brief 处理 退出信号 的消息。
      */
-    void on_msg_sigquit(x_uint32_t xut_size, x_pvoid_t xpvt_dptr);
+    x_void_t on_msg_sigquit(x_uint32_t xut_size, x_pvoid_t xpvt_dptr);
 
     /**********************************************************/
     /**
      * @brief 处理 工作进程结束 的消息。
      */
-    void on_msg_sigchld(x_uint32_t xut_size, x_pvoid_t xpvt_dptr);
+    x_void_t on_msg_sigchld(x_uint32_t xut_size, x_pvoid_t xpvt_dptr);
 
     // data members
 protected:
