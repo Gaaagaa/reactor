@@ -187,13 +187,6 @@ x_int32_t x_ftp_channel_t::post_req_xmsg(x_tcp_io_message_t & xio_message)
 // x_ftp_channel_t : public interfaces
 // 
 
-
-//====================================================================
-
-// 
-// x_ftp_channel_t : internal invoking
-// 
-
 /**********************************************************/
 /**
  * @brief 投递应答操作的 IO 消息（加入 IO 应答消息队列，等待发送）。
@@ -206,12 +199,6 @@ x_int32_t x_ftp_channel_t::post_req_xmsg(x_tcp_io_message_t & xio_message)
  */
 x_int32_t x_ftp_channel_t::post_res_xmsg(const x_io_msgctxt_t & xio_msgctxt)
 {
-    if (X_NULL == get_manager())
-    {
-        LOGE("X_NULL == get_manager()");
-        return -1;
-    }
-
     if (xio_msgctxt.io_size > 0x0000FFFF)
     {
         LOGE("xio_msgctxt.io_size[%d] > 0x0000FFFF", xio_msgctxt.io_size);

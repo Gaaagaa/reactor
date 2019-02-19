@@ -81,10 +81,6 @@ public:
 
     // public interfaces
 public:
-
-
-    // internal invoking
-protected:
     /**********************************************************/
     /**
      * @brief 投递应答操作的 IO 消息（加入 IO 应答消息队列，等待发送）。
@@ -115,13 +111,13 @@ class x_ftp_connection_t : public x_ftp_channel_t
     // common data types
 public:
     /**
-     * @enum  emConstValue
-     * @brief 相关的枚举常量值。
+     * @enum  emConnectionType
+     * @brief 定义连接类型的枚举常量值。
      */
-    typedef enum emConstValue
+    typedef enum emConnectionType
     {
         ECV_CONNECTION_TYPE  = _Xt,  ///< 业务层工作对象的连接类型
-    } emConstValue;
+    } emConnectionType;
 
     using x_type_t  = _Ty;
     using x_super_t = x_ftp_connection_t< _Ty, _Xt >;
