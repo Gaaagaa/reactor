@@ -27,7 +27,7 @@
 #include "xftp_msgctxt.h"
 
 #include "xftp_echo.h"
-#include "xftp_query.h"
+#include "xftp_wclient.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -238,7 +238,7 @@ x_int32_t x_ftp_server_t::startup(void)
 #define REGISTER_IOTYPE(name)   XVERIFY(register_iotype(name::ECV_CONNECTION_TYPE, &name::create))
 
         REGISTER_IOTYPE(x_ftp_echo_t);
-        REGISTER_IOTYPE(x_ftp_query_t);
+        REGISTER_IOTYPE(x_ftp_wclient_t);
 
 #undef  REGISTER_IOTYPE
 

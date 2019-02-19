@@ -1,12 +1,12 @@
 /**
- * @file    xftp_query.h
+ * @file    xftp_wclient.h
  * <pre>
  * Copyright (c) 2019, Gaaagaa All rights reserved.
  * 
- * 文件名称：xftp_query.h
+ * 文件名称：xftp_wclient.h
  * 创建日期：2019年02月14日
  * 文件标识：
- * 文件摘要：提供 xftp 的信息查询服务的业务层工作对象。
+ * 文件摘要：为 xftp 的客户端连接提供基本操作的业务层工作对象。
  * 
  * 当前版本：1.0.0.0
  * 作    者：
@@ -20,19 +20,19 @@
  * </pre>
  */
 
-#ifndef __XFTP_QUERY_H__
-#define __XFTP_QUERY_H__
+#ifndef __XFTP_WCLIENT_H__
+#define __XFTP_WCLIENT_H__
 
 #include "xftp_connection.h"
 
 ////////////////////////////////////////////////////////////////////////////////
-// x_ftp_query_t
+// x_ftp_wclient_t
 
 /**
- * @class x_ftp_query_t
- * @brief 提供 xftp 的信息查询服务的业务层工作对象。
+ * @class x_ftp_wclient_t
+ * @brief 为 xftp 的客户端连接提供基本操作的业务层工作对象。
  */
-class x_ftp_query_t : public x_ftp_connection_t< x_ftp_query_t, 0x0020 >
+class x_ftp_wclient_t : public x_ftp_connection_t< x_ftp_wclient_t, 0x0020 >
 {
     friend x_super_t;
 
@@ -44,8 +44,6 @@ public:
      */
     typedef enum emConstValue
     {
-        ECV_CONNECTION_TYPE  = 0x0020,  ///< 业务层工作对象的连接类型
-
         ECV_GET_MAX_FILES = 100,  ///< 获取文件列表的最大文件数量
     } emConstValue;
 
@@ -55,16 +53,16 @@ public:
      */
     typedef enum emIoContextCmid
     {
-        CMID_QUERY_LOGIN   = x_super_t::ECV_CONNECTION_TYPE,  ///< 登录
+        CMID_WCLI_LOGIN   = x_super_t::ECV_CONNECTION_TYPE,  ///< 登录
 
-        CMID_QUERY_HBEAT   = 0x2000,  ///< 心跳
-        CMID_QUERY_FLIST   = 0x3010,  ///< 获取文件列表
+        CMID_WCLI_HBEAT   = 0x2000,  ///< 心跳
+        CMID_WCLI_FLIST   = 0x3010,  ///< 获取文件列表
     } emIoContextCmid;
 
     // constructor/destructor
 private:
-    explicit x_ftp_query_t(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd);
-    virtual ~x_ftp_query_t(void);
+    explicit x_ftp_wclient_t(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd);
+    virtual ~x_ftp_wclient_t(void);
 
     // overrides
 protected:
@@ -113,5 +111,5 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#endif // __XFTP_QUERY_H__
+#endif // __XFTP_WCLIENT_H__
 
