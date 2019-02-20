@@ -399,31 +399,30 @@ x_int32_t x_ftp_server_t::file_list(x_list_file_t & xlst_files,
 /**
  * @brief 获取文件大小。
  * 
- * @param [in ] xszt_filename : 文件名。
+ * @param [in ] xszt_fname : 文件名。
  * 
  * @return x_int64_t
  *         - 返回 == -1，表示文件 不存在 或 没有访问权限；
  *         - 返回 >=  0，表示操作成功，即为文件大小。
  */
-x_int64_t x_ftp_server_t::file_size(x_cstring_t xszt_filename)
+x_int64_t x_ftp_server_t::file_size(x_cstring_t xszt_fname)
 {
     struct stat xstat_buf;
-    x_int64_t   xit_size = 0;
 
-    if ((X_NULL == xszt_filename) || ('\0' == *xszt_filename))
+    if ((X_NULL == xszt_fname) || ('\0' == *xszt_fname))
     {
         return -1;
     }
 
     // 文件路径名
-    std::string xstr_filename;
-    xstr_filename  = _S_xszt_files_dir;
-    xstr_filename += xszt_filename;
+    std::string xstr_fname;
+    xstr_fname  = _S_xszt_files_dir;
+    xstr_fname += xszt_fname;
 
-    if (0 != stat(xstr_filename.c_str(), &xstat_buf))
+    if (0 != stat(xstr_fname.c_str(), &xstat_buf))
     {
-        LOGE("stat(xstr_filename.c_str()[%s], ...) errno : %d",
-             xstr_filename.c_str(), errno);
+        LOGE("stat(xstr_fname.c_str()[%s], ...) errno : %d",
+             xstr_fname.c_str(), errno);
         return -1;
     }
 
@@ -432,14 +431,116 @@ x_int64_t x_ftp_server_t::file_size(x_cstring_t xszt_filename)
         return -1;
     }
 
-    if (0 != access(xstr_filename.c_str(), R_OK | W_OK))
+    if (0 != access(xstr_fname.c_str(), R_OK | W_OK))
     {
-        LOGE("access(xstr_filename.c_str()[%s], ...) errno : %d",
-             xstr_filename.c_str(), errno);
+        LOGE("access(xstr_fname.c_str()[%s], ...) errno : %d",
+             xstr_fname.c_str(), errno);
         return -1;
     }
 
     return (x_int64_t)xstat_buf.st_size;
+}
+
+/**********************************************************/
+/**
+ * @brief 获取文件全路径名。
+ * 
+ * @param [in ] xszt_fname : 文件名。
+ * @param [out] xstr_fpath : 操作成功返回的文件全路径名。
+ * 
+ * @return x_int32_t
+ *         - 成功，返回 0；
+ *         - 失败，返回 错误码。
+ */
+x_int32_t file_path(x_cstring_t xszt_fname, std::string & xstr_fpath)
+{
+    struct stat xstat_buf;
+
+    if ((X_NULL == xszt_fname) || ('\0' == *xszt_fname))
+    {
+        return -1;
+    }
+
+    // 文件路径名
+    std::string xstr_fname;
+    xstr_fname  = _S_xszt_files_dir;
+    xstr_fname += xszt_fname;
+
+    if (0 != stat(xstr_fname.c_str(), &xstat_buf))
+    {
+        LOGE("stat(xstr_fname.c_str()[%s], ...) errno : %d",
+             xstr_fname.c_str(), errno);
+        return -1;
+    }
+
+    if (!S_ISREG(xstat_buf.st_mode))
+    {
+        return -1;
+    }
+
+    if (0 != access(xstr_fname.c_str(), R_OK | W_OK))
+    {
+        LOGE("access(xstr_fname.c_str()[%s], ...) errno : %d",
+             xstr_fname.c_str(), errno);
+        return -1;
+    }
+
+    xstr_fpath = xstr_fname;
+
+    return 0;
+}
+
+/**********************************************************/
+/**
+ * @brief 获取文件全路径名与文件大小。
+ * 
+ * @param [in ] xszt_fname : 文件名。
+ * @param [out] xstr_fpath : 操作成功返回的文件全路径名。
+ * @param [out] xit_fsize  : 操作成功返回的文件大小。
+ * 
+ * @return x_int32_t
+ *         - 成功，返回 0；
+ *         - 失败，返回 错误码。
+ */
+x_int32_t x_ftp_server_t::file_info(x_cstring_t xszt_fname,
+                                    std::string & xstr_fpath,
+                                    x_int64_t & xit_fsize)
+{
+    struct stat xstat_buf;
+
+    if ((X_NULL == xszt_fname) || ('\0' == *xszt_fname))
+    {
+        return -1;
+    }
+
+    // 文件路径名
+    std::string xstr_fname;
+    xstr_fname  = _S_xszt_files_dir;
+    xstr_fname += xszt_fname;
+
+    if (0 != stat(xstr_fname.c_str(), &xstat_buf))
+    {
+        LOGE("stat(xstr_fname.c_str()[%s], ...) errno : %d",
+             xstr_fname.c_str(), errno);
+        return -1;
+    }
+
+    if (!S_ISREG(xstat_buf.st_mode))
+    {
+        return -1;
+    }
+
+    if (0 != access(xstr_fname.c_str(), R_OK | W_OK))
+    {
+        LOGE("access(xstr_fname.c_str()[%s], ...) errno : %d",
+             xstr_fname.c_str(), errno);
+        return -1;
+    }
+
+    xstr_fpath = xstr_fname;
+    xit_fsize  = (x_int64_t)xstat_buf.st_size;
+
+    return 0;
 }
 
 //====================================================================

@@ -161,13 +161,40 @@ public:
     /**
      * @brief 获取文件大小。
      * 
-     * @param [in ] xszt_filename : 文件名。
+     * @param [in ] xszt_fname : 文件名。
      * 
      * @return x_int64_t
      *         - 返回 == -1，表示文件 不存在 或 没有访问权限；
      *         - 返回 >=  0，表示操作成功，即为文件大小。
      */
-    x_int64_t file_size(x_cstring_t xszt_filename);
+    x_int64_t file_size(x_cstring_t xszt_fname);
+
+    /**********************************************************/
+    /**
+     * @brief 获取文件全路径名。
+     * 
+     * @param [in ] xszt_fname : 文件名。
+     * @param [out] xstr_fpath : 操作成功返回的文件全路径名。
+     * 
+     * @return x_int32_t
+     *         - 成功，返回 0；
+     *         - 失败，返回 错误码。
+     */
+    x_int32_t file_path(x_cstring_t xszt_fname, std::string & xstr_fpath);
+
+    /**********************************************************/
+    /**
+     * @brief 获取文件全路径名与文件大小。
+     * 
+     * @param [in ] xszt_fname : 文件名。
+     * @param [out] xstr_fpath : 操作成功返回的文件全路径名。
+     * @param [out] xit_fsize  : 操作成功返回的文件大小。
+     * 
+     * @return x_int32_t
+     *         - 成功，返回 0；
+     *         - 失败，返回 错误码。
+     */
+    x_int32_t file_info(x_cstring_t xszt_fname, std::string & xstr_fpath, x_int64_t & xit_fsize);
 
     // internal invoking
 private:

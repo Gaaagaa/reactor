@@ -174,7 +174,7 @@ x_int32_t x_ftp_wclient_t::iocmd_flist(x_uint16_t xut_seqn, x_uchar_t * xct_dptr
         {
             Json::Value j_file;
             j_file["file"] = itlst->first;
-            j_file["size"] = itlst->second;
+            j_file["size"] = (Json::Int64)itlst->second;
 
             j_list.append(j_file);
         }
@@ -237,7 +237,7 @@ x_int32_t x_ftp_wclient_t::iocmd_fsize(x_uint16_t xut_seqn, x_uchar_t * xct_dptr
 
         Json::Value j_file;
         j_file["file"] = xstr_fname;
-        j_file["size"] = x_ftp_server_t::instance().file_size(xstr_fname.c_str());
+        j_file["size"] = (Json::Int64)x_ftp_server_t::instance().file_size(xstr_fname.c_str());
 
         //======================================
 
