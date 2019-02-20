@@ -149,8 +149,8 @@ x_int32_t x_ftp_download_t::post_res_chunk(x_uint16_t xut_seqn, x_int64_t xit_of
 
         if ((X_NULL == m_xht_fstream) || (xut_rdsize <= 0))
         {
-            LOGE("[fd:%d](X_NULL == m_xht_fstream) || (xut_rdsize <= 0)",
-                 get_sockfd());
+            LOGE("[fd:%d](X_NULL == m_xht_fstream) || (xut_rdsize[%d] <= 0)",
+                 get_sockfd(), xut_rdsize);
             xit_error = -1;
             break;
         }
