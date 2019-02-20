@@ -83,7 +83,7 @@ BOOL CXftpClientDlg::OnInitDialog()
     m_wndListFiles.InsertColumn(nCol++, TEXT("文件大小"), LVCFMT_CENTER, 80 );
     m_wndListFiles.DeleteColumn(0);
     m_wndListFiles.SetRowHeight(24);
-    m_wndListFiles.EnableSortItem(TRUE);
+    m_wndListFiles.EnableSortItem(FALSE);
     m_wndListFiles.EnableLayoutColumn(TRUE);
 
     nCol = 0;
