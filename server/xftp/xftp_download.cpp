@@ -202,9 +202,9 @@ x_int32_t x_ftp_download_t::post_res_chunk(x_uint16_t xut_seqn, x_int64_t xit_of
         xio_msgctxt.io_seqn = xut_seqn;
         xio_msgctxt.io_cmid = CMID_DLOAD_CHUNK;
         xio_msgctxt.io_size = sizeof(x_int64_t) + sizeof(x_uint32_t) + xut_rdsize;
-        xio_msgctxt.io_dptr = X_NULL;
+        xio_msgctxt.io_dptr = X_NULL; // 设置为 X_NULL 的时候，则不进行数据拷贝操作
 
-        XVERIFY(IOCTX_ERR_OK == io_context_uinfo(xio_message.data(), xio_message.capacity(), &xio_msgctxt));
+        XVERIFY(IOCTX_ERR_OK == io_set_context(xio_message.data(), xio_message.capacity(), &xio_msgctxt));
 
         xio_message.reset(IO_HDSIZE + xio_msgctxt.io_size, 0);
         push_res_xmsg(std::move(xio_message));

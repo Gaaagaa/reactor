@@ -86,6 +86,69 @@ x_ulong_t vx_htonl(x_ulong_t xut_long)
     return htonl(xut_long);
 }
 
+/**********************************************************/
+/**
+ * @brief 判断系统是否为小端字节序。
+ */
+static inline x_bool_t is_little_endian(void)
+{
+    union x_little_endian_t
+    {
+        x_int32_t xit_32;
+        x_int8_t  xit_8;
+    } xlet_value;
+
+    xlet_value.xit_32 = 1;
+
+    return (1 == xlet_value.xit_8);
+}
+
+/**********************************************************/
+/**
+ * @brief 字节序转换：64 位整数从 网络字节序 转成 主机字节序。
+ */
+x_ullong_t vx_ntohll(x_ullong_t xult_llong)
+{
+#ifdef _MSC_VER
+    static x_bool_t xbt_little_endian = is_little_endian();
+    if (xbt_little_endian)
+        return (((x_ullong_t)ntohl((x_ulong_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
+                ((x_ullong_t)ntohl((x_ulong_t)(xult_llong >> 32)));
+    else
+        return xult_llong;
+#else // !_MSC_VER
+#if (__BYTE_ORDER == __LITTLE_ENDIAN)
+    return (((x_ullong_t)ntohl((x_ulong_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
+            ((x_ullong_t)ntohl((x_ulong_t)(xult_llong >> 32)));
+#else // (__BYTE_ORDER == __BIG_ENDIAN)
+    return xult_llong;
+#endif // (__BYTE_ORDER == __LITTLE_ENDIAN)
+#endif // _MSC_VER
+}
+
+/**********************************************************/
+/**
+ * @brief 字节序转换：64 位整数从 主机字节序 转成 网络字节序。
+ */
+x_ullong_t vx_htonll(x_ullong_t xult_llong)
+{
+#ifdef _MSC_VER
+    static x_bool_t xbt_little_endian = is_little_endian();
+    if (xbt_little_endian)
+        return (((x_ullong_t)htonl((x_ulong_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
+                ((x_ullong_t)htonl((x_ulong_t)(xult_llong >> 32)));
+    else
+        return xult_llong;
+#else // !_MSC_VER
+#if (__BYTE_ORDER == __LITTLE_ENDIAN)
+    return (((x_ullong_t)htonl((x_ulong_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
+            ((x_ullong_t)htonl((x_ulong_t)(xult_llong >> 32)));
+#else // (__BYTE_ORDER == __BIG_ENDIAN)
+    return xult_llong;
+#endif // (__BYTE_ORDER == __LITTLE_ENDIAN)
+#endif // _MSC_VER
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 #define IO_CHECK_LEAD(xptr)     ((0xEF == (xptr)[0]) && (0xFE == (xptr)[1]))
@@ -259,7 +322,7 @@ x_int32_t io_set_context(x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen, const 
     xio_nptr->io_size = vx_htons((x_uint16_t)(xio_ctx_ptr->io_size & 0x0000FFFF));
 
     // 数据体
-    if (xio_ctx_ptr->io_size > 0)
+    if ((xio_ctx_ptr->io_size > 0) && (X_NULL != xio_ctx_ptr->io_dptr))
     {
         memcpy(xio_nptr->io_dptr, xio_ctx_ptr->io_dptr, xio_ctx_ptr->io_size);
     }

@@ -221,20 +221,6 @@ x_int32_t io_context_rinfo(const x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen
  */
 x_int32_t io_context_winfo(x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen, const x_io_msgctxt_t * xio_ctx_ptr);
 
-/**********************************************************/
-/**
- * @brief 对网络 IO 消息缓存，更新 IO 消息上下文描述信息（不进行数据拷贝）。
- * 
- * @param [out] xct_io_dptr : 网络 IO 消息缓存。
- * @param [in ] xut_io_dlen : 网络 IO 消息缓存长度。
- * @param [in ] xio_ctx_ptr : 写入的 IO 消息上下文描述信息。
- * 
- * @return x_int32_t
- *         - 成功，返回 IOCTX_ERR_OK；
- *         - 失败，返回 错误码。
- */
-x_int32_t io_context_uinfo(x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen, const x_io_msgctxt_t * xio_ctx_ptr);
-
 ////////////////////////////////////////////////////////////////////////////////
 
 #ifdef __cplusplus

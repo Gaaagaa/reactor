@@ -322,7 +322,7 @@ x_int32_t io_set_context(x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen, const 
     xio_nptr->io_size = vx_htons((x_uint16_t)(xio_ctx_ptr->io_size & 0x0000FFFF));
 
     // 数据体
-    if (xio_ctx_ptr->io_size > 0)
+    if ((xio_ctx_ptr->io_size > 0) && (X_NULL != xio_ctx_ptr->io_dptr))
     {
         memcpy(xio_nptr->io_dptr, xio_ctx_ptr->io_dptr, xio_ctx_ptr->io_size);
     }
@@ -472,52 +472,3 @@ x_int32_t io_context_winfo(x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen, cons
 
     return IOCTX_ERR_OK;
 }
-
-/**********************************************************/
-/**
- * @brief 对网络 IO 消息缓存，更新 IO 消息上下文描述信息（不进行数据拷贝）。
- * 
- * @param [out] xct_io_dptr : 网络 IO 消息缓存。
- * @param [in ] xut_io_dlen : 网络 IO 消息缓存长度。
- * @param [in ] xio_ctx_ptr : 写入的 IO 消息上下文描述信息。
- * 
- * @return x_int32_t
- *         - 成功，返回 IOCTX_ERR_OK；
- *         - 失败，返回 错误码。
- */
-x_int32_t io_context_uinfo(x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen, const x_io_msgctxt_t * xio_ctx_ptr)
-{
-    x_io_msghead_t * xio_nptr = (x_io_msghead_t *)xct_io_dptr;
-
-    //======================================
-    // 参数的有效验证
-
-    XASSERT(X_NULL != xct_io_dptr);
-    XASSERT(X_NULL != xio_ctx_ptr);
-
-    if ((xut_io_dlen < (IO_HDSIZE + xio_ctx_ptr->io_size)) ||
-        (xio_ctx_ptr->io_size > 0x0000FFFF))
-    {
-        return IOCTX_ERR_PARAM;
-    }
-
-    // 前导码
-    IO_WRITE_LEAD(xct_io_dptr);
-
-    // 标识号
-    xio_nptr->io_seqn = vx_htons(xio_ctx_ptr->io_seqn);
-
-    // 命令ID
-    xio_nptr->io_cmid = vx_htons(xio_ctx_ptr->io_cmid);
-
-    // 数据体长度
-    xio_nptr->io_size = vx_htons((x_uint16_t)(xio_ctx_ptr->io_size & 0x0000FFFF));
-
-    // 校验和
-    xio_nptr->io_csum = vx_htons(io_check_sum(xct_io_dptr + IO_CHKSUM_BPOS, (IO_HDSIZE - IO_CHKSUM_BPOS) + xio_ctx_ptr->io_size));
-
-    //======================================
-
-    return IOCTX_ERR_OK;
-}
-
