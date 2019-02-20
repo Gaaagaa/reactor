@@ -69,6 +69,7 @@ x_int32_t x_ftp_wclient_t::io_event_requested(x_tcp_io_message_t & xio_message)
         case CMID_WCLI_LOGIN : xit_error = iocmd_login(xio_msgctxt.io_seqn, xio_msgctxt.io_dptr, xio_msgctxt.io_size); break;
         case CMID_WCLI_HBEAT : xit_error = iocmd_hbeat(xio_msgctxt.io_seqn, xio_msgctxt.io_dptr, xio_msgctxt.io_size); break;
         case CMID_WCLI_FLIST : xit_error = iocmd_flist(xio_msgctxt.io_seqn, xio_msgctxt.io_dptr, xio_msgctxt.io_size); break;
+        case CMID_WCLI_FSIZE : xit_error = iocmd_fsize(xio_msgctxt.io_seqn, xio_msgctxt.io_dptr, xio_msgctxt.io_size); break;
 
         default:
             break;
@@ -147,17 +148,19 @@ x_int32_t x_ftp_wclient_t::iocmd_hbeat(x_uint16_t xut_seqn, x_uchar_t * xct_dptr
  */
 x_int32_t x_ftp_wclient_t::iocmd_flist(x_uint16_t xut_seqn, x_uchar_t * xct_dptr, x_uint32_t xut_size)
 {
+    std::string xstr_jtext = "[]";
+
     do
     {
         //======================================
         // 文件列表
 
         x_ftp_server_t::x_list_file_t xlst_filenames;
-        x_ftp_server_t::instance().get_file_list(xlst_filenames, ECV_GET_MAX_FILES);
+        x_ftp_server_t::instance().file_list(xlst_filenames, ECV_GET_MAX_FILES);
 
         if (xlst_filenames.empty())
         {
-            LOGW("x_ftp_server_t::get_file_list(xlst_filenames, ...) return empty list!");
+            LOGW("x_ftp_server_t::file_list(xlst_filenames, ...) return empty list!");
             break;
         }
 
@@ -176,37 +179,89 @@ x_int32_t x_ftp_wclient_t::iocmd_flist(x_uint16_t xut_seqn, x_uchar_t * xct_dptr
             j_list.append(j_file);
         }
 
-        Json::StreamWriterBuilder j_builder;
-        j_builder.settings_["indentation"            ] = "";
-        j_builder.settings_["enableYAMLCompatibility"] = false;
-
-        std::unique_ptr< Json::StreamWriter > j_writer(j_builder.newStreamWriter());
-
-        std::ostringstream xstr_ostr;
-        j_writer->write(j_list, &xstr_ostr);
-
-        std::string xstr_jlist = xstr_ostr.str();
-        if (xstr_jlist.size() >= 0x0000FFFF)
-        {
-            LOGW("xstr_jlist.size()[%d] >= 0x0000FFFF, it's too long!",
-                 (x_int32_t)xstr_jlist.size());
-            xstr_jlist = "";
-        }
-
         //======================================
-        // 投递应答信息
 
-        x_io_msgctxt_t xio_msgctxt;
-        xio_msgctxt.io_seqn = xut_seqn;
-        xio_msgctxt.io_cmid = CMID_WCLI_FLIST;
-        xio_msgctxt.io_size = (x_uint32_t)xstr_jlist.size();
-        xio_msgctxt.io_dptr = (x_uchar_t *)const_cast< x_char_t * >(xstr_jlist.c_str());
+        Json::StreamWriterBuilder j_builder;
+        j_builder["indentation"            ] = "";
+        j_builder["enableYAMLCompatibility"] = false;
 
-        post_res_xmsg(xio_msgctxt);
+        xstr_jtext = Json::writeString(j_builder, j_list);
+        if (xstr_jtext.size() >= 0x0000FFFF)
+        {
+            LOGW("xstr_jtext.size()[%d] >= 0x0000FFFF, it's too long!",
+                 (x_int32_t)xstr_jtext.size());
+            xstr_jtext = "[]";
+        }
 
         //======================================
 
     } while (0);
+
+    //======================================
+    // 投递应答信息
+
+    x_io_msgctxt_t xio_msgctxt;
+    xio_msgctxt.io_seqn = xut_seqn;
+    xio_msgctxt.io_cmid = CMID_WCLI_FLIST;
+    xio_msgctxt.io_size = (x_uint32_t)xstr_jtext.size();
+    xio_msgctxt.io_dptr = (x_uchar_t *)const_cast< x_char_t * >(xstr_jtext.c_str());
+
+    post_res_xmsg(xio_msgctxt);
+
+    //======================================
+
+    return 0;
+}
+
+/**********************************************************/
+/**
+ * @brief 处理 IO 请求命令：获取文件大小。
+ */
+x_int32_t x_ftp_wclient_t::iocmd_fsize(x_uint16_t xut_seqn, x_uchar_t * xct_dptr, x_uint32_t xut_size)
+{
+    std::string xstr_jtext = "{\"file\":\"\",\"size\":-1}";
+
+    do
+    {
+        //======================================
+        // 参数有效判断
+
+        if ((X_NULL == xct_dptr) || (0 == *xct_dptr) || (xut_size <= 0))
+        {
+            break;
+        }
+
+        //======================================
+
+        std::string xstr_fname((x_char_t *)xct_dptr, (x_char_t *)xct_dptr + xut_size);
+
+        Json::Value j_file;
+        j_file["file"] = xstr_fname;
+        j_file["size"] = x_ftp_server_t::instance().file_size(xstr_fname.c_str());
+
+        //======================================
+
+        Json::StreamWriterBuilder j_builder;
+        j_builder["indentation"            ] = "";
+        j_builder["enableYAMLCompatibility"] = false;
+
+        xstr_jtext = Json::writeString(j_builder, j_file);
+
+        //======================================
+    } while (0);
+
+    //======================================
+    // 投递应答信息
+
+    x_io_msgctxt_t xio_msgctxt;
+    xio_msgctxt.io_seqn = xut_seqn;
+    xio_msgctxt.io_cmid = CMID_WCLI_FSIZE;
+    xio_msgctxt.io_size = (x_uint32_t)xstr_jtext.size();
+    xio_msgctxt.io_dptr = (x_uchar_t *)const_cast< x_char_t * >(xstr_jtext.c_str());
+
+    post_res_xmsg(xio_msgctxt);
+
+    //======================================
 
     return 0;
 }

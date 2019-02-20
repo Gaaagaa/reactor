@@ -44,7 +44,7 @@ public:
      */
     typedef enum emConstValue
     {
-        ECV_GET_MAX_FILES = 100,  ///< 获取文件列表的最大文件数量
+        ECV_GET_MAX_FILES = 500,  ///< 获取文件列表的最大文件数量
     } emConstValue;
 
     /**
@@ -57,6 +57,7 @@ public:
 
         CMID_WCLI_HBEAT   = 0x2000,  ///< 心跳
         CMID_WCLI_FLIST   = 0x3010,  ///< 获取文件列表
+        CMID_WCLI_FSIZE   = 0x3020,  ///< 获取文件大小
     } emIoContextCmid;
 
     // constructor/destructor
@@ -103,6 +104,12 @@ protected:
      * @brief 处理 IO 请求命令：获取文件列表。
      */
     x_int32_t iocmd_flist(x_uint16_t xut_seqn, x_uchar_t * xct_dptr, x_uint32_t xut_size);
+
+    /**********************************************************/
+    /**
+     * @brief 处理 IO 请求命令：获取文件大小。
+     */
+    x_int32_t iocmd_fsize(x_uint16_t xut_seqn, x_uchar_t * xct_dptr, x_uint32_t xut_size);
 
     // data members
 private:

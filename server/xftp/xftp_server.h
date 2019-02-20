@@ -57,7 +57,7 @@ public:
     typedef std::map< x_uint16_t, x_func_create_t > x_map_func_create_t;
 
     /** 文件列表[ 文件名，文件大小 ] */
-    typedef std::list< std::pair< std::string, x_uint32_t > > x_list_file_t;
+    typedef std::list< std::pair< std::string, x_int64_t > > x_list_file_t;
 
     // common invoking
 public:
@@ -155,7 +155,19 @@ public:
      *         - 成功，返回 0；
      *         - 失败，返回 错误码。
      */
-    x_int32_t get_file_list(x_list_file_t & xlst_files, x_uint32_t xut_max_files);
+    x_int32_t file_list(x_list_file_t & xlst_files, x_uint32_t xut_max_files);
+
+    /**********************************************************/
+    /**
+     * @brief 获取文件大小。
+     * 
+     * @param [in ] xszt_filename : 文件名。
+     * 
+     * @return x_int64_t
+     *         - 返回 == -1，表示文件 不存在 或 没有访问权限；
+     *         - 返回 >=  0，表示操作成功，即为文件大小。
+     */
+    x_int64_t file_size(x_cstring_t xszt_filename);
 
     // internal invoking
 private:
@@ -176,19 +188,22 @@ private:
 
     /**********************************************************/
     /**
-     * @brief 处理 “套接字接收连接” 的事件回调操作（该接口仅由 xio_event() 调用）。
+     * @brief 处理 “套接字接收连接” 的事件回调操作。
+     * @note  该接口仅由 xio_event() 调用。
      */
     x_int32_t xio_event_accept(x_sockfd_t xfdt_sockfd, x_handle_t xht_optargs);
 
     /**********************************************************/
     /**
-     * @brief 处理 “建立业务层工作对象” 的事件回调操作（该接口仅由 xio_event() 调用）。
+     * @brief 处理 “建立业务层工作对象” 的事件回调操作。
+     * @note  该接口仅由 xio_event() 调用。
      */
     x_int32_t xio_event_create(x_sockfd_t xfdt_sockfd, x_handle_t xht_optargs);
 
     /**********************************************************/
     /**
-     * @brief 处理 “巡检操作” 的事件回调操作（该接口仅由 xio_event() 调用）。
+     * @brief 处理 “巡检操作” 的事件回调操作。
+     * @note  该接口仅由 xio_event() 调用。
      */
     x_int32_t xio_event_verify(x_sockfd_t xfdt_sockfd, x_handle_t xht_optargs);
 

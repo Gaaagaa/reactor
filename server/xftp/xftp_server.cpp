@@ -317,8 +317,8 @@ x_void_t x_ftp_server_t::unregister_iotype(x_uint16_t xut_iotype)
  *         - 成功，返回 0；
  *         - 失败，返回 错误码。
  */
-x_int32_t x_ftp_server_t::get_file_list(x_list_file_t & xlst_files,
-                                        x_uint32_t xut_max_files)
+x_int32_t x_ftp_server_t::file_list(x_list_file_t & xlst_files,
+                                    x_uint32_t xut_max_files)
 {
     struct stat     xstat_buf;
     struct dirent * xdirent_ptr = X_NULL;
@@ -374,7 +374,8 @@ x_int32_t x_ftp_server_t::get_file_list(x_list_file_t & xlst_files,
         xstr_filename = xdirent_ptr->d_name;
         if (!xstr_filename.empty())
         {
-            xlst_files.push_back(std::make_pair(xstr_filename, (x_uint32_t)xstat_buf.st_size));
+            xlst_files.push_back(
+                std::make_pair(xstr_filename, (x_int64_t)xstat_buf.st_size));
         }
 
         if (++xut_count >= xut_max_files)
@@ -392,6 +393,53 @@ x_int32_t x_ftp_server_t::get_file_list(x_list_file_t & xlst_files,
     }
 
     return 0;
+}
+
+/**********************************************************/
+/**
+ * @brief 获取文件大小。
+ * 
+ * @param [in ] xszt_filename : 文件名。
+ * 
+ * @return x_int64_t
+ *         - 返回 == -1，表示文件 不存在 或 没有访问权限；
+ *         - 返回 >=  0，表示操作成功，即为文件大小。
+ */
+x_int64_t x_ftp_server_t::file_size(x_cstring_t xszt_filename)
+{
+    struct stat xstat_buf;
+    x_int64_t   xit_size = 0;
+
+    if ((X_NULL == xszt_filename) || ('\0' == *xszt_filename))
+    {
+        return -1;
+    }
+
+    // 文件路径名
+    std::string xstr_filename;
+    xstr_filename  = _S_xszt_files_dir;
+    xstr_filename += xszt_filename;
+
+    if (0 != stat(xstr_filename.c_str(), &xstat_buf))
+    {
+        LOGE("stat(xstr_filename.c_str()[%s], ...) errno : %d",
+             xstr_filename.c_str(), errno);
+        return -1;
+    }
+
+    if (!S_ISREG(xstat_buf.st_mode))
+    {
+        return -1;
+    }
+
+    if (0 != access(xstr_filename.c_str(), R_OK | W_OK))
+    {
+        LOGE("access(xstr_filename.c_str()[%s], ...) errno : %d",
+             xstr_filename.c_str(), errno);
+        return -1;
+    }
+
+    return (x_int64_t)xstat_buf.st_size;
 }
 
 //====================================================================
@@ -432,7 +480,8 @@ x_int32_t x_ftp_server_t::xio_event(x_sockfd_t xfdt_sockfd,
 
 /**********************************************************/
 /**
- * @brief 处理 “套接字接收连接” 的事件回调操作（该接口仅由 xio_event() 调用）。
+ * @brief 处理 “套接字接收连接” 的事件回调操作。
+ * @note  该接口仅由 xio_event() 调用。
  */
 x_int32_t x_ftp_server_t::xio_event_accept(x_sockfd_t xfdt_sockfd, x_handle_t xht_optargs)
 {
@@ -441,7 +490,8 @@ x_int32_t x_ftp_server_t::xio_event_accept(x_sockfd_t xfdt_sockfd, x_handle_t xh
 
 /**********************************************************/
 /**
- * @brief 处理 “建立业务层工作对象” 的事件回调操作（该接口仅由 xio_event() 调用）。
+ * @brief 处理 “建立业务层工作对象” 的事件回调操作。
+ * @note  该接口仅由 xio_event() 调用。
  */
 x_int32_t x_ftp_server_t::xio_event_create(x_sockfd_t xfdt_sockfd, x_handle_t xht_optargs)
 {
@@ -513,7 +563,8 @@ x_int32_t x_ftp_server_t::xio_event_create(x_sockfd_t xfdt_sockfd, x_handle_t xh
 
 /**********************************************************/
 /**
- * @brief 处理 “巡检操作” 的事件回调操作（该接口仅由 xio_event() 调用）。
+ * @brief 处理 “巡检操作” 的事件回调操作。
+ * @note  该接口仅由 xio_event() 调用。
  */
 x_int32_t x_ftp_server_t::xio_event_verify(x_sockfd_t xfdt_sockfd, x_handle_t xht_optargs)
 {
