@@ -199,7 +199,7 @@ x_int32_t singleton_run(x_cstring_t xszt_fname)
     // truncate file
 
     ftruncate(xit_fd, 0);
-    write(xit_fd, xszt_fnbuf, snprintf(xszt_fnbuf, TEXT_LEN_32, "%ld\n", (x_long_t)getpid()) + 1);
+    write(xit_fd, xszt_fnbuf, snprintf(xszt_fnbuf, TEXT_LEN_32, "%d\n", get_pid()) + 1);
 
     // do not close file...
 
