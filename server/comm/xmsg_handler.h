@@ -90,7 +90,7 @@ class x_spec_subscriber_t : public x_msg_subscriber_t< _Ty, x_uint32_t, x_uint32
     // common data types
 public:
     using __super_type = x_msg_subscriber_t< _Ty, x_uint32_t, x_uint32_t, x_pvoid_t >;
-    using __obser_type = x_spec_subscriber_t< _Ty, _Mt >;
+    using __subscriber = x_spec_subscriber_t< _Ty, _Mt >;
 
     using x_this_t     = typename __super_type::x_this_t;
     using x_typeid_t   = typename __super_type::x_typeid_t;
