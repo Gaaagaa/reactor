@@ -57,6 +57,18 @@ x_ulong_t vx_ntohl(x_ulong_t xut_long);
  */
 x_ulong_t vx_htonl(x_ulong_t xut_long);
 
+/**********************************************************/
+/**
+ * @brief 字节序转换：64 位整数从 网络字节序 转成 主机字节序。
+ */
+x_ullong_t vx_ntohll(x_ullong_t xult_llong);
+
+/**********************************************************/
+/**
+ * @brief 字节序转换：64 位整数从 主机字节序 转成 网络字节序。
+ */
+x_ullong_t vx_htonll(x_ullong_t xult_llong);
+
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -208,6 +220,20 @@ x_int32_t io_context_rinfo(const x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen
  *         - 失败，返回 错误码。
  */
 x_int32_t io_context_winfo(x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen, const x_io_msgctxt_t * xio_ctx_ptr);
+
+/**********************************************************/
+/**
+ * @brief 对网络 IO 消息缓存，更新 IO 消息上下文描述信息（不进行数据拷贝）。
+ * 
+ * @param [out] xct_io_dptr : 网络 IO 消息缓存。
+ * @param [in ] xut_io_dlen : 网络 IO 消息缓存长度。
+ * @param [in ] xio_ctx_ptr : 写入的 IO 消息上下文描述信息。
+ * 
+ * @return x_int32_t
+ *         - 成功，返回 IOCTX_ERR_OK；
+ *         - 失败，返回 错误码。
+ */
+x_int32_t io_context_uinfo(x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen, const x_io_msgctxt_t * xio_ctx_ptr);
 
 ////////////////////////////////////////////////////////////////////////////////
 

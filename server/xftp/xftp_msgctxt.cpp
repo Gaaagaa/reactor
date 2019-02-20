@@ -86,6 +86,69 @@ x_ulong_t vx_htonl(x_ulong_t xut_long)
     return htonl(xut_long);
 }
 
+/**********************************************************/
+/**
+ * @brief 判断系统是否为小端字节序。
+ */
+static inline x_bool_t is_little_endian(void)
+{
+    union x_little_endian_t
+    {
+        x_int32_t xit_32;
+        x_int8_t  xit_8;
+    } xlet_value;
+
+    xlet_value.xit_32 = 1;
+
+    return (1 == xlet_value.xit_8);
+}
+
+/**********************************************************/
+/**
+ * @brief 字节序转换：64 位整数从 网络字节序 转成 主机字节序。
+ */
+x_ullong_t vx_ntohll(x_ullong_t xult_llong)
+{
+#ifdef _MSC_VER
+    static x_bool_t xbt_little_endian = is_little_endian();
+    if (xbt_little_endian)
+        return (((x_ullong_t)ntohl((x_ulong_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
+                ((x_ullong_t)ntohl((x_ulong_t)(xult_llong >> 32)));
+    else
+        return xult_llong;
+#else // !_MSC_VER
+#if (__BYTE_ORDER == __LITTLE_ENDIAN)
+    return (((x_ullong_t)ntohl((x_ulong_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
+            ((x_ullong_t)ntohl((x_ulong_t)(xult_llong >> 32)));
+#else // (__BYTE_ORDER == __BIG_ENDIAN)
+    return xult_llong;
+#endif // (__BYTE_ORDER == __LITTLE_ENDIAN)
+#endif // _MSC_VER
+}
+
+/**********************************************************/
+/**
+ * @brief 字节序转换：64 位整数从 主机字节序 转成 网络字节序。
+ */
+x_ullong_t vx_htonll(x_ullong_t xult_llong)
+{
+#ifdef _MSC_VER
+    static x_bool_t xbt_little_endian = is_little_endian();
+    if (xbt_little_endian)
+        return (((x_ullong_t)htonl((x_ulong_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
+                ((x_ullong_t)htonl((x_ulong_t)(xult_llong >> 32)));
+    else
+        return xult_llong;
+#else // !_MSC_VER
+#if (__BYTE_ORDER == __LITTLE_ENDIAN)
+    return (((x_ullong_t)htonl((x_ulong_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
+            ((x_ullong_t)htonl((x_ulong_t)(xult_llong >> 32)));
+#else // (__BYTE_ORDER == __BIG_ENDIAN)
+    return xult_llong;
+#endif // (__BYTE_ORDER == __LITTLE_ENDIAN)
+#endif // _MSC_VER
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 #define IO_CHECK_LEAD(xptr)     ((0xEF == (xptr)[0]) && (0xFE == (xptr)[1]))
@@ -409,3 +472,52 @@ x_int32_t io_context_winfo(x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen, cons
 
     return IOCTX_ERR_OK;
 }
+
+/**********************************************************/
+/**
+ * @brief 对网络 IO 消息缓存，更新 IO 消息上下文描述信息（不进行数据拷贝）。
+ * 
+ * @param [out] xct_io_dptr : 网络 IO 消息缓存。
+ * @param [in ] xut_io_dlen : 网络 IO 消息缓存长度。
+ * @param [in ] xio_ctx_ptr : 写入的 IO 消息上下文描述信息。
+ * 
+ * @return x_int32_t
+ *         - 成功，返回 IOCTX_ERR_OK；
+ *         - 失败，返回 错误码。
+ */
+x_int32_t io_context_uinfo(x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen, const x_io_msgctxt_t * xio_ctx_ptr)
+{
+    x_io_msghead_t * xio_nptr = (x_io_msghead_t *)xct_io_dptr;
+
+    //======================================
+    // 参数的有效验证
+
+    XASSERT(X_NULL != xct_io_dptr);
+    XASSERT(X_NULL != xio_ctx_ptr);
+
+    if ((xut_io_dlen < (IO_HDSIZE + xio_ctx_ptr->io_size)) ||
+        (xio_ctx_ptr->io_size > 0x0000FFFF))
+    {
+        return IOCTX_ERR_PARAM;
+    }
+
+    // 前导码
+    IO_WRITE_LEAD(xct_io_dptr);
+
+    // 标识号
+    xio_nptr->io_seqn = vx_htons(xio_ctx_ptr->io_seqn);
+
+    // 命令ID
+    xio_nptr->io_cmid = vx_htons(xio_ctx_ptr->io_cmid);
+
+    // 数据体长度
+    xio_nptr->io_size = vx_htons((x_uint16_t)(xio_ctx_ptr->io_size & 0x0000FFFF));
+
+    // 校验和
+    xio_nptr->io_csum = vx_htons(io_check_sum(xct_io_dptr + IO_CHKSUM_BPOS, (IO_HDSIZE - IO_CHKSUM_BPOS) + xio_ctx_ptr->io_size));
+
+    //======================================
+
+    return IOCTX_ERR_OK;
+}
+
