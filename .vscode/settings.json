@@ -8,7 +8,8 @@
         "**/*.o": true,
         "**/tmp": true,
         "**/third/source": true,
-        "**/test/xftp_client": true
+        "**/test/xftp_client/obj": true,
+        "**/test/xftp_client/sln/.vs": true
     },
     
     "files.associations": {
