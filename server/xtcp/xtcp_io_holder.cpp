@@ -276,7 +276,7 @@ void x_tcp_io_task_t::run(x_running_checker_t * xchecker_ptr)
             std::chrono::system_clock::now() -
             std::chrono::system_clock::time_point(std::chrono::system_clock::duration(m_xit_timev)));
 
-    STD_TRACE("[%s] task delay time: %ld us", task_event_text(m_xut_event), xtime_delay.count());
+    STD_TRACE("[%s] task delay time: %lld us", task_event_text(m_xut_event), (x_int64_t)xtime_delay.count());
 
     x_io_csptr_t xio_csptr = m_xio_cwptr.lock();
     if (nullptr != xio_csptr)
