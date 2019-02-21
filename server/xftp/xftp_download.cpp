@@ -193,7 +193,7 @@ x_int32_t x_ftp_download_t::post_res_chunk(x_uint16_t xut_seqn, x_int64_t xit_of
 
         *(x_ullong_t *)(xct_dptr) = vx_htonll(xit_offset); xct_dptr += sizeof(x_ullong_t);
         *(x_ulong_t  *)(xct_dptr) = vx_htonl (xut_rdsize); xct_dptr += sizeof(x_ulong_t );
-        XVERIFY(xut_rdsize == (x_uint32_t)fread(xct_dptr, xut_rdsize, 1, (FILE *)m_xht_fstream));
+        XVERIFY(xut_rdsize == (x_uint32_t)fread(xct_dptr, sizeof(x_uchar_t), xut_rdsize, (FILE *)m_xht_fstream));
 
         //======================================
         // 设置应答消息的头部信息后，加入到消息应答队列
