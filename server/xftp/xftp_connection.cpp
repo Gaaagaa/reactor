@@ -62,17 +62,14 @@ x_uint32_t x_ftp_channel_t::xmsg_split(x_tcp_io_message_t & xio_message,
 
     while (-1 != (xit_vpos = io_find_context(xct_dptr, xut_dlen, &xio_msgctxt)))
     {
-        xct_dptr = xct_dptr + xit_vpos;
-        xut_dlen = IO_HDSIZE + xio_msgctxt.io_size;
-
         xlst_iomsg.push_back(
             std::forward< x_tcp_io_message_t >(
                 x_tcp_io_message_t(xct_dptr + xit_vpos, IO_HDSIZE + xio_msgctxt.io_size)));
         xut_count += 1;
 
-        xit_vlen = xit_vpos + IO_HDSIZE + xio_msgctxt.io_size;
-        xct_dptr = xct_dptr + xit_vlen;
-        xut_dlen = xut_dlen - xit_vlen;
+        xit_vlen  = xit_vpos + IO_HDSIZE + xio_msgctxt.io_size;
+        xct_dptr += xit_vlen;
+        xut_dlen -= xit_vlen;
     }
 
     if (xio_message.rlen() != xut_dlen)
