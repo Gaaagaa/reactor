@@ -126,10 +126,10 @@
     <ClInclude Include="json\writer.h">
       <Filter>Json</Filter>
     </ClInclude>
-    <ClInclude Include="xftp\xftp_cliworker.h">
+    <ClInclude Include="xftp\xftp_dltask.h">
       <Filter>xftp</Filter>
     </ClInclude>
-    <ClInclude Include="xftp\xftp_download.h">
+    <ClInclude Include="xftp\xftp_cliworker.h">
       <Filter>xftp</Filter>
     </ClInclude>
   </ItemGroup>
@@ -185,10 +185,10 @@
     <ClCompile Include="json\json_writer.cpp">
       <Filter>Json</Filter>
     </ClCompile>
-    <ClCompile Include="xftp\xftp_cliworker.cpp">
+    <ClCompile Include="xftp\xftp_dltask.cpp">
       <Filter>xftp</Filter>
     </ClCompile>
-    <ClCompile Include="xftp\xftp_download.cpp">
+    <ClCompile Include="xftp\xftp_cliworker.cpp">
       <Filter>xftp</Filter>
     </ClCompile>
   </ItemGroup>

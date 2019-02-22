@@ -233,7 +233,7 @@
     <ClInclude Include="XftpClientApp.h" />
     <ClInclude Include="xftp\xftp_client.h" />
     <ClInclude Include="xftp\xftp_cliworker.h" />
-    <ClInclude Include="xftp\xftp_download.h" />
+    <ClInclude Include="xftp\xftp_dltask.h" />
     <ClInclude Include="xftp\xftp_msgctxt.h" />
   </ItemGroup>
   <ItemGroup>
@@ -294,7 +294,7 @@
     <ClCompile Include="XftpClientApp.cpp" />
     <ClCompile Include="xftp\xftp_client.cpp" />
     <ClCompile Include="xftp\xftp_cliworker.cpp" />
-    <ClCompile Include="xftp\xftp_download.cpp" />
+    <ClCompile Include="xftp\xftp_dltask.cpp" />
     <ClCompile Include="xftp\xftp_msgctxt.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>

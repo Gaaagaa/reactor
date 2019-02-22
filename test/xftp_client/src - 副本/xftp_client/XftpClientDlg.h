@@ -24,7 +24,7 @@
 
 #include "vxListCtrl.h"
 #include "xftp/xftp_client.h"
-#include "xftp/xftp_download.h"
+#include "xthreadpool.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // CXftpClientDlg dialog
@@ -73,15 +73,9 @@ protected:
 
     /**********************************************************/
     /**
-     * @brief 处理 x_ftp_client_t 对象的 网络 IO 错误 消息。
+     * @brief 处理 获取文件列表 的消息。
      */
-    x_void_t on_msg_wcli_ioerr(x_uint32_t xut_size, x_pvoid_t xpvt_dptr);
-
-    /**********************************************************/
-    /**
-     * @brief 处理 x_ftp_client_t 对象的 获取文件列表 消息。
-     */
-    x_void_t on_msg_wcli_flist(x_uint32_t xut_size, x_pvoid_t xpvt_dptr);
+    x_void_t on_msg_flist(x_uint32_t xut_size, x_pvoid_t xpvt_dptr);
 
     // data members
 protected:
@@ -91,8 +85,8 @@ protected:
     vxListCtrl      m_wndListFiles;  ///< 文件列表控件
     vxListCtrl      m_wndListTasks;  ///< 下载任务列表控件
 
-    x_ftp_client_t    m_xftp_client;   ///< 客户端的网络连接工作对象
-    x_ftp_download_t  m_xftp_dload;
+    x_ftp_client_t  m_xftp_client;   ///< 客户端的网络连接工作对象
+    x_threadpool_t  m_xthreadpool;   ///< 用于执行异步操作任务的线程池对象
 
 	// message map handlers
 protected:

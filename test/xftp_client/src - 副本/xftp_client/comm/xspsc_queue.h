@@ -75,20 +75,18 @@ private:
      */
     typedef struct x_chunk_t
     {
-        x_element_t * xet_array;   ///< 当前内存块中的元素节点数组
-        x_chunk_t   * xprev_ptr;   ///< 指向前一内存块节点
-        x_chunk_t   * xnext_ptr;   ///< 指向后一内存块节点
+        x_element_t  array[_En];  ///< 当前内存块中的元素节点数组
+        x_chunk_t  * prev_ptr;    ///< 指向前一内存块节点
+        x_chunk_t  * next_ptr;    ///< 指向后一内存块节点
     } x_chunk_t;
 
 #ifdef _MSC_VER
     using ssize_t = std::intptr_t;
 #endif // _MSC_VER
 
-    using x_chunk_ptr_t   = x_chunk_t *;
-    using x_atomic_ptr_t  = std::atomic< x_chunk_ptr_t >;
+    using x_atomic_ptr_t  = std::atomic< x_chunk_t * >;
     using x_atomic_size_t = std::atomic< size_t >;
-    using x_allocator_t   = _Alloc; 
-    using x_chunk_alloc_t = typename std::allocator_traits< x_allocator_t >::template rebind_alloc< x_chunk_t >;
+    using x_allocator_t   = _Alloc;
 
     // constructor/destructor
 public:
@@ -121,7 +119,7 @@ public:
             }
 
             xchunk_ptr = m_chk_begin_ptr;
-            m_chk_begin_ptr = m_chk_begin_ptr->xnext_ptr;
+            m_chk_begin_ptr = m_chk_begin_ptr->next_ptr;
             if (nullptr != xchunk_ptr)
                 free_chunk(xchunk_ptr);
         }
@@ -161,7 +159,7 @@ public:
      */
     void push(const x_element_t & xemt_value)
     {
-        x_allocator_t::construct(&m_chk_end_ptr->xet_array[m_xst_end_pos], xemt_value);
+        x_allocator_t::construct(&m_chk_end_ptr->array[m_xst_end_pos], xemt_value);
 
         m_chk_back_ptr = m_chk_end_ptr;
         m_xst_back_pos = m_xst_end_pos;
@@ -176,7 +174,7 @@ public:
      */
     void push(x_element_t && xemt_value)
     {
-        x_allocator_t::construct(&m_chk_end_ptr->xet_array[m_xst_end_pos],
+        x_allocator_t::construct(&m_chk_end_ptr->array[m_xst_end_pos],
                                  std::forward< x_element_t >(xemt_value));
 
         m_chk_back_ptr = m_chk_end_ptr;
@@ -195,7 +193,7 @@ public:
         if (empty())
             return;
         m_xst_queue_size.fetch_sub(1);
-        x_allocator_t::destroy(&m_chk_begin_ptr->xet_array[m_xst_begin_pos]);
+        x_allocator_t::destroy(&m_chk_begin_ptr->array[m_xst_begin_pos]);
         move_begin_pos();
     }
 
@@ -206,7 +204,7 @@ public:
     inline x_element_t & front(void)
     {
         XASSERT(!empty());
-        return m_chk_begin_ptr->xet_array[m_xst_begin_pos];
+        return m_chk_begin_ptr->array[m_xst_begin_pos];
     }
 
     /**********************************************************/
@@ -216,7 +214,7 @@ public:
     inline const x_element_t & front(void) const
     {
         XASSERT(!empty());
-        return m_chk_begin_ptr->xet_array[m_xst_begin_pos];
+        return m_chk_begin_ptr->array[m_xst_begin_pos];
     }
 
     /**********************************************************/
@@ -226,7 +224,7 @@ public:
     inline x_element_t & back(void)
     {
         XASSERT(!empty());
-        return m_chk_back_ptr->xet_array[m_xst_back_pos];
+        return m_chk_back_ptr->array[m_xst_back_pos];
     }
 
     /**********************************************************/
@@ -236,7 +234,7 @@ public:
     inline const x_element_t & back(void) const
     {
         XASSERT(!empty());
-        return m_chk_back_ptr->xet_array[m_xst_back_pos];
+        return m_chk_back_ptr->array[m_xst_back_pos];
     }
 
     // internal invoking
@@ -245,30 +243,19 @@ private:
     /**
      * @brief 申请一个存储元素节点的内存块。
      */
-    x_chunk_ptr_t alloc_chunk(void)
+    x_chunk_t * alloc_chunk(void)
     {
-        x_chunk_alloc_t xchunk_allocator(*(x_allocator_t *)this);
+        constexpr size_t const xchunk_count =
+            (sizeof(x_chunk_t) + sizeof(x_element_t) - 1) / sizeof(x_element_t);
 
-        x_chunk_ptr_t xchunk_ptr = xchunk_allocator.allocate(1);
+        x_chunk_t * xchunk_ptr =
+            reinterpret_cast< x_chunk_t * >(x_allocator_t::allocate(xchunk_count));
         XASSERT(nullptr != xchunk_ptr);
-
         if (nullptr != xchunk_ptr)
         {
-            xchunk_ptr->xet_array = x_allocator_t::allocate(_En);
-            XASSERT(nullptr != xchunk_ptr->xet_array);
-
-            if (nullptr != xchunk_ptr->xet_array)
-            {
-                xchunk_ptr->xprev_ptr = nullptr;
-                xchunk_ptr->xnext_ptr = nullptr;
-            }
-            else
-            {
-                xchunk_allocator.deallocate(xchunk_ptr, 1);
-                xchunk_ptr = nullptr;
-            }
+            xchunk_ptr->prev_ptr = nullptr;
+            xchunk_ptr->next_ptr = nullptr;
         }
-
         return xchunk_ptr;
     }
 
@@ -276,15 +263,14 @@ private:
     /**
      * @brief 释放一个存储元素节点的内存块。
      */
-    void free_chunk(x_chunk_ptr_t xchunk_ptr)
+    void free_chunk(x_chunk_t * xchunk_ptr)
     {
+        constexpr size_t const xchunk_count =
+            (sizeof(x_chunk_t) + sizeof(x_element_t) - 1) / sizeof(x_element_t);
+
         if (nullptr != xchunk_ptr)
         {
-            if (nullptr != xchunk_ptr->xet_array)
-                x_allocator_t::deallocate(xchunk_ptr->xet_array, _En);
-
-            x_chunk_alloc_t xchunk_allocator(*(x_allocator_t *)this);
-            xchunk_allocator.deallocate(xchunk_ptr, 1);
+            x_allocator_t::deallocate(reinterpret_cast< x_element_t * >(xchunk_ptr), xchunk_count);
         }
     }
 
@@ -296,10 +282,10 @@ private:
     {
         if (++m_xst_begin_pos == _En)
         {
-            x_chunk_ptr_t xchunk_ptr = m_chk_begin_ptr;
-            m_chk_begin_ptr = m_chk_begin_ptr->xnext_ptr;
+            x_chunk_t * xchunk_ptr = m_chk_begin_ptr;
+            m_chk_begin_ptr = m_chk_begin_ptr->next_ptr;
             XASSERT(nullptr != m_chk_begin_ptr);
-            m_chk_begin_ptr->xprev_ptr = nullptr;
+            m_chk_begin_ptr->prev_ptr = nullptr;
             m_xst_begin_pos = 0;
 
             xchunk_ptr = m_chk_swap_ptr.exchange(xchunk_ptr);
@@ -316,33 +302,33 @@ private:
     {
         if (++m_xst_end_pos == _En)
         {
-            x_chunk_ptr_t xchunk_ptr = m_chk_swap_ptr.exchange(nullptr);
+            x_chunk_t * xchunk_ptr = m_chk_swap_ptr.exchange(nullptr);
             if (nullptr != xchunk_ptr)
             {
-                m_chk_end_ptr->xnext_ptr = xchunk_ptr;
-                xchunk_ptr->xprev_ptr = m_chk_end_ptr;
+                m_chk_end_ptr->next_ptr = xchunk_ptr;
+                xchunk_ptr->prev_ptr = m_chk_end_ptr;
             }
             else
             {
-                m_chk_end_ptr->xnext_ptr = alloc_chunk();
-                m_chk_end_ptr->xnext_ptr->xprev_ptr = m_chk_end_ptr;
+                m_chk_end_ptr->next_ptr = alloc_chunk();
+                m_chk_end_ptr->next_ptr->prev_ptr = m_chk_end_ptr;
             }
 
-            m_chk_end_ptr = m_chk_end_ptr->xnext_ptr;
+            m_chk_end_ptr = m_chk_end_ptr->next_ptr;
             m_xst_end_pos = 0;
         }
     }
 
     // data members
 protected:
-    x_chunk_ptr_t    m_chk_begin_ptr;  ///< 内存块链表的起始块
-    ssize_t          m_xst_begin_pos;  ///< 队列中的首个元素位置
-    x_chunk_ptr_t    m_chk_end_ptr;    ///< 内存块链表的结束块
-    ssize_t          m_xst_end_pos;    ///< 队列中的元素结束位置
-    x_chunk_ptr_t    m_chk_back_ptr;   ///< 内存块链表的结尾块
-    ssize_t          m_xst_back_pos;   ///< 队列中的结尾元素位置
-    x_atomic_size_t  m_xst_queue_size; ///< 队列中的有效元素数量
-    x_atomic_ptr_t   m_chk_swap_ptr;   ///< 用于保存临时内存块（备用缓存块）
+    x_chunk_t       * m_chk_begin_ptr;  ///< 内存块链表的起始块
+    ssize_t           m_xst_begin_pos;  ///< 队列中的首个元素位置
+    x_chunk_t       * m_chk_end_ptr;    ///< 内存块链表的结束块
+    ssize_t           m_xst_end_pos;    ///< 队列中的元素结束位置
+    x_chunk_t       * m_chk_back_ptr;   ///< 内存块链表的结尾块
+    ssize_t           m_xst_back_pos;   ///< 队列中的结尾元素位置
+    x_atomic_size_t   m_xst_queue_size; ///< 队列中的有效元素数量
+    x_atomic_ptr_t    m_chk_swap_ptr;   ///< 用于保存临时内存块（备用缓存块）
 };
 
 ////////////////////////////////////////////////////////////////////////////////

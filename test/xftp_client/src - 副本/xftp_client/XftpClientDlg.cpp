@@ -134,7 +134,7 @@ void CXftpClientDlg::OnOK()
 
 void CXftpClientDlg::OnCancel()
 {
-    if (m_xftp_client.is_login())
+    if (m_xftp_client.is_startup())
     {
         if (IDOK != ::MessageBox(m_hWnd,
                                  TEXT("网络连接尚未断开，确定现在要退出程序吗？"),
@@ -160,8 +160,7 @@ void CXftpClientDlg::OnCancel()
  */
 x_int32_t CXftpClientDlg::init_msg_handler(void)
 {
-    XVERIFY(__subscriber::register_mkey(XMKEY_WCLI_IOERR, &CXftpClientDlg::on_msg_wcli_ioerr));
-    XVERIFY(__subscriber::register_mkey(XMKEY_WCLI_FLIST, &CXftpClientDlg::on_msg_wcli_flist));
+    XVERIFY(__subscriber::register_mkey(XMKEY_WCLI_FLIST, &CXftpClientDlg::on_msg_flist));
     XVERIFY(__subscriber::jointo_dispatch(this));
     XVERIFY(__subscriber::register_msg_diapatch());
 
@@ -180,18 +179,9 @@ x_void_t CXftpClientDlg::reset_msg_handler(void)
 
 /**********************************************************/
 /**
- * @brief 处理 x_ftp_client_t 对象的 网络 IO 错误 消息。
+ * @brief 处理 获取文件列表 的消息。
  */
-x_void_t CXftpClientDlg::on_msg_wcli_ioerr(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
-{
-    m_xftp_client.logout();
-}
-
-/**********************************************************/
-/**
- * @brief 处理 x_ftp_client_t 对象的 获取文件列表 消息。
- */
-x_void_t CXftpClientDlg::on_msg_wcli_flist(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
+x_void_t CXftpClientDlg::on_msg_flist(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
 {
     m_wndListFiles.DeleteAllItems();
 
@@ -267,9 +257,14 @@ void CXftpClientDlg::OnDestroy()
 
     //======================================
 
-    if (m_xftp_client.is_login())
+    if (m_xftp_client.is_startup())
     {
-        m_xftp_client.logout();
+        m_xftp_client.shutdown();
+    }
+
+    if (m_xthreadpool.is_startup())
+    {
+        m_xthreadpool.shutdown();
     }
 
     //======================================
@@ -377,7 +372,7 @@ void CXftpClientDlg::OnBnClickedBtnSvrcnt()
 
     //======================================
 
-    if (m_xftp_client.is_login())
+    if (m_xftp_client.is_startup())
     {
         return;
     }
@@ -392,7 +387,7 @@ void CXftpClientDlg::OnBnClickedBtnSvrcnt()
     x_uint16_t xwt_port = (x_uint16_t)_tstoi(strText);
 
      // 发起网络连接
-     xit_error = m_xftp_client.login(xszt_host, xwt_port);
+     xit_error = m_xftp_client.startup(xszt_host, xwt_port);
      if (0 != xit_error)
      {
          ::MessageBox(m_hWnd, TEXT("连接服务终端失败！"), TEXT("系统提示"), MB_ICONINFORMATION | MB_OK);
@@ -408,7 +403,7 @@ void CXftpClientDlg::OnBnClickedBtnSvrcnt()
  */
 void CXftpClientDlg::OnBnClickedBtnSvrdown()
 {
-    m_xftp_client.logout();
+    m_xftp_client.shutdown();
 }
 
 /**********************************************************/
@@ -417,7 +412,7 @@ void CXftpClientDlg::OnBnClickedBtnSvrdown()
  */
 void CXftpClientDlg::OnBnClickedBtnFlist()
 {
-    if (!m_xftp_client.is_login())
+    if (!m_xftp_client.is_startup())
     {
         return;
     }
@@ -437,48 +432,7 @@ void CXftpClientDlg::OnBnClickedBtnFlist()
  */
 void CXftpClientDlg::OnBnClickedBtnEnload()
 {
-    if (!m_xftp_client.is_login() || (m_wndListFiles.GetSelectedCount() <= 0))
-    {
-        return;
-    }
 
-    CString strText;
-
-    //======================================
-    // 文件路径名 和 文件大小
-
-    POSITION pos = m_wndListFiles.GetFirstSelectedItemPosition();
-    int nItem = m_wndListFiles.GetNextSelectedItem(pos);
-
-    GetDlgItem(IDC_EDIT_LOCALPATH)->GetWindowText(strText);
-    strText += m_wndListFiles.GetItemText(nItem, 0);
-
-    x_char_t xszt_fpath[TEXT_LEN_1K] = { 0 };
-    TextToUtf8(xszt_fpath, TEXT_LEN_1K, (LPCTSTR)strText);
-
-    strText = m_wndListFiles.GetItemText(nItem, 1);
-    x_int64_t xit_fsize = _tstoll(strText);
-
-    //======================================
-
-    // IP
-    GetDlgItem(IDC_IPA_IPHOST)->GetWindowText(strText);
-    x_char_t xszt_host[TEXT_LEN_64] = { 0 };
-    TextToAnsi(xszt_host, TEXT_LEN_64, (LPCTSTR)strText);
-
-    // PORT
-    GetDlgItem(IDC_EDIT_PORT)->GetWindowText(strText);
-    x_uint16_t xwt_port = (x_uint16_t)_tstoi(strText);
-
-    // 发起网络连接
-    x_int32_t xit_error = m_xftp_dload.login(xszt_host, xwt_port, xszt_fpath, xit_fsize);
-    if (0 != xit_error)
-    {
-        ::MessageBox(m_hWnd, TEXT("连接服务终端失败！"), TEXT("系统提示"), MB_ICONINFORMATION | MB_OK);
-        return;
-    }
-
-    //======================================
 }
 
 /**********************************************************/
@@ -487,6 +441,10 @@ void CXftpClientDlg::OnBnClickedBtnEnload()
  */
 void CXftpClientDlg::OnBnClickedBtnDownpause()
 {
+    if (!m_xftp_client.is_startup())
+    {
+        return;
+    }
 
 }
 
@@ -496,7 +454,11 @@ void CXftpClientDlg::OnBnClickedBtnDownpause()
  */
 void CXftpClientDlg::OnBnClickedBtnDownstop()
 {
-    m_xftp_dload.logout();
+    if (!m_xftp_client.is_startup())
+    {
+        return;
+    }
+
 }
 
 /**********************************************************/
@@ -534,3 +496,5 @@ void CXftpClientDlg::OnBnClickedBtnLocalpath()
         lpItemIdList = NULL;
     }
 }
+
+
