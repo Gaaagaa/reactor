@@ -28,6 +28,7 @@
 
 #include "xftp_echo.h"
 #include "xftp_wclient.h"
+#include "xftp_download.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -239,6 +240,7 @@ x_int32_t x_ftp_server_t::startup(void)
 
         REGISTER_IOTYPE(x_ftp_echo_t);
         REGISTER_IOTYPE(x_ftp_wclient_t);
+        REGISTER_IOTYPE(x_ftp_download_t);
 
 #undef  REGISTER_IOTYPE
 
