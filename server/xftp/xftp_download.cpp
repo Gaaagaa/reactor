@@ -38,7 +38,6 @@ x_ftp_download_t::x_ftp_download_t(x_handle_t xht_manager, x_sockfd_t xfdt_sockf
     , m_xstr_fname("")
     , m_xstr_fpath("")
     , m_xit_fsize(0)
-    , m_xht_fstream(X_NULL)
 {
 
 }
@@ -106,14 +105,31 @@ x_int32_t x_ftp_download_t::io_event_responsed(x_tcp_io_message_t & xio_message)
 
 /**********************************************************/
 /**
+ * @brief IO 任务对象在执行过程中产生的 IO 消息错误通知。
+ * 
+ * @param [in ] xio_message : 产生错误的 IO 消息对象。
+ * @param [in ] xit_etype   : 产生错误的 IO 操作类型（参看 emIoXmsgErrorType 枚举值）。
+ * @param [in ] xit_errno   : 通知的错误码。
+ * 
+ * @return x_int32_t
+ *         - 操作状态码（未使用）。
+ */
+x_int32_t x_ftp_download_t::io_event_xmsgerror(
+    x_tcp_io_message_t & xio_message, x_int32_t xit_etype, x_int32_t xit_errno)
+{
+    STD_TRACE("io_event_xmsgerror : %d, %d", xit_etype, xit_errno);
+    return 0;
+}
+
+/**********************************************************/
+/**
  * @brief 处理 “IO 通道对象被销毁” 的事件。
  */
 x_int32_t x_ftp_download_t::io_event_destroyed(void)
 {
-    if (X_NULL != m_xht_fstream)
+    if (m_xio_fstream.is_open())
     {
-        fclose((FILE *)m_xht_fstream);
-        m_xht_fstream = X_NULL;
+        m_xio_fstream.close();
     }
 
     return 0;
@@ -147,9 +163,11 @@ x_int32_t x_ftp_download_t::post_res_chunk(x_uint16_t xut_seqn, x_int64_t xit_of
         //======================================
         // 参数有效校验
 
-        if ((X_NULL == m_xht_fstream) || (xut_rdsize <= 0))
+        STD_TRACE("[ORG]xit_offset = %lld, xut_rdsize = %d", xit_offset, xut_rdsize);
+
+        if (!m_xio_fstream.is_open() || (xut_rdsize <= 0))
         {
-            LOGE("[fd:%d](X_NULL == m_xht_fstream) || (xut_rdsize[%d] <= 0)",
+            LOGE("[fd:%d]!m_xio_fstream.is_open() || (xut_rdsize[%d] <= 0)",
                  get_sockfd(), xut_rdsize);
             xit_error = -1;
             break;
@@ -175,25 +193,21 @@ x_int32_t x_ftp_download_t::post_res_chunk(x_uint16_t xut_seqn, x_int64_t xit_of
         }
 
         //======================================
-        // 偏移文件的读指针位置
-
-        if (-1 == fseek((FILE *)m_xht_fstream, xit_offset, SEEK_SET))
-        {
-            LOGE("[fd:%d]-1 == fseek((FILE *)m_xht_fstream, xit_offset[%lld], SEEK_SET) error : %d",
-                 get_sockfd(), xit_offset, errno);
-            xit_error = -1;
-            break;
-        }
-
-        //======================================
         // 读取数据
 
         x_tcp_io_message_t xio_message(IO_HDSIZE + sizeof(x_int64_t) + sizeof(x_uint32_t) + xut_rdsize);
         x_uchar_t * xct_dptr = xio_message.data() + IO_HDSIZE;
 
-        *(x_ullong_t *)(xct_dptr) = vx_htonll(xit_offset); xct_dptr += sizeof(x_ullong_t);
-        *(x_ulong_t  *)(xct_dptr) = vx_htonl (xut_rdsize); xct_dptr += sizeof(x_ulong_t );
-        XVERIFY(xut_rdsize == (x_uint32_t)fread(xct_dptr, sizeof(x_uchar_t), xut_rdsize, (FILE *)m_xht_fstream));
+        *(x_ullong_t *)(xct_dptr) = vx_htonll(xit_offset);
+        xct_dptr += sizeof(x_ullong_t);
+
+        *(x_ulong_t *)(xct_dptr) = vx_htonl(xut_rdsize);
+        xct_dptr += sizeof(x_ulong_t);
+
+        // m_xio_fstream.seekg(xit_offset, std::ios::beg);
+        m_xio_fstream.read((x_char_t *)xct_dptr, xut_rdsize);
+
+        STD_TRACE("HEX : %s", LOG_HEX(xio_message.data() + IO_HDSIZE, 64));
 
         //======================================
         // 设置应答消息的头部信息后，加入到消息应答队列
@@ -272,16 +286,14 @@ x_int32_t x_ftp_download_t::iocmd_login(x_uint16_t xut_seqn, x_uchar_t * xct_dpt
         //======================================
         // （只读方式）打开文件流操作句柄
 
-        FILE * xfs_handle = fopen(m_xstr_fpath.c_str(), "rb");
-        if (X_NULL == xfs_handle)
+        m_xio_fstream.open(m_xstr_fpath.c_str(), std::ios::in | std::ios::binary);
+        if (!m_xio_fstream.is_open())
         {
-            LOGE("[fd:%d]fopen(m_xstr_fpath.c_str()[%s], \"rb\") return X_NULL, errno : %d",
+            LOGE("[fd:%d]m_xio_fstream.open(m_xstr_fpath.c_str()[%s], std::ios::in | std::ios::binary) errno : %d",
                  get_sockfd(), m_xstr_fpath.c_str(), errno);
             xit_error = -1;
             break;
         }
-
-        m_xht_fstream = (x_handle_t)xfs_handle;
 
         //======================================
         xit_error = 0;
@@ -342,6 +354,8 @@ x_int32_t x_ftp_download_t::iocmd_chunk(x_uint16_t xut_seqn, x_uchar_t * xct_dpt
         x_int64_t  xit_offset = (x_int64_t )vx_ntohll(*(x_ullong_t *)(xct_dptr));
         x_uint32_t xut_rdsize = (x_uint32_t)vx_ntohl (*(x_ulong_t  *)(xct_dptr + sizeof(x_ullong_t)));
         x_uint32_t xut_mpause = (x_uint32_t)vx_ntohl (*(x_ulong_t  *)(xct_dptr + sizeof(x_ullong_t) + sizeof(x_uint32_t)));
+
+        STD_TRACE("xit_offset = %lld, xut_rdsize = %d, xut_mpause = %d", xit_offset, xut_rdsize, xut_mpause);
 
         //======================================
 

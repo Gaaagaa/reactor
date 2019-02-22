@@ -24,6 +24,7 @@
 #define __XFTP_DOWNLOAD_H__
 
 #include "xftp_connection.h"
+#include <fstream>
 
 ////////////////////////////////////////////////////////////////////////////////
 // x_ftp_download_t
@@ -59,6 +60,9 @@ public:
         CMID_DLOAD_PAUSE  = 0x2020,  ///< 暂停下载
     } emIoContextCmid;
 
+private:
+    using x_fileno_t = x_sockfd_t;
+
     // constructor/destructor
 private:
     explicit x_ftp_download_t(x_handle_t xht_manager, x_sockfd_t xfdt_sockfd);
@@ -77,6 +81,21 @@ protected:
      * @brief 处理 “完成 IO 应答消息” 的事件。
      */
     virtual x_int32_t io_event_responsed(x_tcp_io_message_t & xio_message) override;
+
+    /**********************************************************/
+    /**
+     * @brief IO 任务对象在执行过程中产生的 IO 消息错误通知。
+     * 
+     * @param [in ] xio_message : 产生错误的 IO 消息对象。
+     * @param [in ] xit_etype   : 产生错误的 IO 操作类型（参看 emIoXmsgErrorType 枚举值）。
+     * @param [in ] xit_errno   : 通知的错误码。
+     * 
+     * @return x_int32_t
+     *         - 操作状态码（未使用）。
+     */
+    virtual x_int32_t io_event_xmsgerror(x_tcp_io_message_t & xio_message,
+                                         x_int32_t xit_etype,
+                                         x_int32_t xit_errno) override;
 
     /**********************************************************/
     /**
@@ -146,7 +165,7 @@ private:
     std::string   m_xstr_fpath;     ///< 请求下载的文件全路径名
     x_int64_t     m_xit_fsize;      ///< 文件总大小
 
-    x_handle_t    m_xht_fstream;    ///< 文件流的工作句柄
+    std::ifstream m_xio_fstream;    ///< 文件数据读取操作的文件流对象
     x_bool_t      m_xbt_pause;      ///< 暂停标识
 };
 
