@@ -208,7 +208,7 @@ protected:
 #define LOG_BUF(xut_size)            x_log_tconv_t::alloc_buffer((x_handle_t)(xht_tconv), (xut_size))
 
 /** 用于宏输出接口内 生成十六进制格式字符串 */
-#define LOG_HEX(xct_dptr, xut_size)  x_log_tconv_t::hex((x_handle_t)(xht_tconv), (xct_dptr), (xut_size))
+#define LOG_HEX(xct_dptr, xut_size)  x_log_tconv_t::hex_dump((x_handle_t)(xht_tconv), (xct_dptr), (xut_size))
 
 /** 使用标准设备输出信息 */
 #define STD_TRACE(xszt_format, ...)               \
