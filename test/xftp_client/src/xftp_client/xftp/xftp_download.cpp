@@ -380,19 +380,20 @@ x_int32_t x_ftp_download_t::iocmd_chunk(x_uint16_t xut_seqn, x_uchar_t * xct_dpt
 
         x_uchar_t * xct_vptr = xct_dptr;
 
-        x_int64_t  xit_offset = (x_int64_t )vx_ntohll(*(x_int64_t  *)xct_vptr); xct_vptr += sizeof(x_int64_t );
-        x_uint32_t xut_lchunk = (x_uint32_t)vx_ntohl (*(x_uint32_t *)xct_vptr); xct_vptr += sizeof(x_uint32_t);
+        x_int64_t xit_offset = (x_int64_t)vx_ntohll(*(x_int64_t  *)xct_vptr);
+        xct_vptr += sizeof(x_int64_t);
+
+        x_uint32_t xut_lchunk = (x_uint32_t)vx_ntohl(*(x_uint32_t *)xct_vptr);
+        xct_vptr += sizeof(x_uint32_t);
+
+        TRACE(TEXT("xit_offset : %lld, xut_lchunk : %d\n"), xit_offset, xut_lchunk);
 
         //======================================
         // 写入文件块数据
 
         LARGE_INTEGER xoffset;
         xoffset.QuadPart = xit_offset;
-        if (!SetFilePointerEx(m_xht_fstream, xoffset, X_NULL, FILE_BEGIN))
-        {
-            xit_error = -1;
-            break;
-        }
+        SetFilePointerEx(m_xht_fstream, xoffset, X_NULL, FILE_BEGIN);
 
         xit_error = 0;
 
@@ -421,6 +422,8 @@ x_int32_t x_ftp_download_t::iocmd_chunk(x_uint16_t xut_seqn, x_uchar_t * xct_dpt
         {
             break;
         }
+
+        FlushFileBuffers(m_xht_fstream);
 
         xbt_write = X_TRUE;
 

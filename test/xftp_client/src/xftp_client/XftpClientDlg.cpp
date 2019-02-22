@@ -347,7 +347,7 @@ LRESULT CXftpClientDlg::OnKickIdle(WPARAM wParam, LPARAM lParam)
     GetDlgItem(IDC_BTN_FLIST    )->EnableWindow(bLogin);
     GetDlgItem(IDC_BTN_ENLOAD   )->EnableWindow(bSelItemF);
     GetDlgItem(IDC_BTN_DOWNPAUSE)->EnableWindow(bSelItemT);
-    GetDlgItem(IDC_BTN_DOWNSTOP )->EnableWindow(bSelItemT);
+    // GetDlgItem(IDC_BTN_DOWNSTOP )->EnableWindow(bSelItemT);
     GetDlgItem(IDC_BTN_LOCALPATH)->EnableWindow(!bLogin);
 
     return 0;
@@ -517,7 +517,7 @@ void CXftpClientDlg::OnBnClickedBtnLocalpath()
     xBInfo.lParam         = 0;
     xBInfo.iImage         = 0;
 
-    //弹出选择目录对话框
+    // 弹出选择目录对话框
     LPITEMIDLIST lpItemIdList = SHBrowseForFolder(&xBInfo);
 
     if ((NULL != lpItemIdList) && SHGetPathFromIDList(lpItemIdList, szPath))

@@ -483,7 +483,8 @@ x_void_t x_ftp_cliworker_t::thread_recv_run(void)
  */
 x_int32_t x_ftp_cliworker_t::io_recved(x_uchar_t * const xct_io_dptr, x_uint32_t & xut_io_dlen)
 {
-    x_int32_t xit_err = 0;
+#if 0
+    x_int32_t xit_error = 0;
 
     x_uint32_t xut_dlen = xut_io_dlen;
 
@@ -498,7 +499,7 @@ x_int32_t x_ftp_cliworker_t::io_recved(x_uchar_t * const xct_io_dptr, x_uint32_t
             STD_TRACE("io_find_ldcode(xct_io_dptr, xut_dlen[%d]) return -1", xut_dlen);
 
             xut_io_dlen = 0xFFFFFFFF;
-            xit_err = -1;
+            xit_error = -1;
             break;
         }
 
@@ -526,6 +527,34 @@ x_int32_t x_ftp_cliworker_t::io_recved(x_uchar_t * const xct_io_dptr, x_uint32_t
         xut_io_dlen = xit_read_pos;
     } while (0);
 
-    return xit_err;
+    return xit_error;
+#else
+    x_uchar_t * xct_dptr = (x_uchar_t *)xct_io_dptr;
+    x_uint32_t  xut_dlen = xut_io_dlen;
+    x_int32_t   xit_vpos = -1;
+    x_int32_t   xit_vlen = 0;
+
+    x_io_msgctxt_t xio_msgctxt;
+
+    if ((X_NULL == xct_dptr) || (xut_dlen <= 0))
+    {
+        xut_io_dlen = 0;
+        return 0;
+    }
+
+    while (-1 != (xit_vpos = io_find_context(xct_dptr, xut_dlen, &xio_msgctxt)))
+    {
+        // Í¶µÝ·Ö°ü
+        io_recved_msgctxt(xio_msgctxt);
+
+        xit_vlen  = xit_vpos + IO_HDSIZE + xio_msgctxt.io_size;
+        xct_dptr += xit_vlen;
+        xut_dlen -= xit_vlen;
+    }
+
+    xut_io_dlen = (x_uint32_t)(xct_dptr - xct_io_dptr);
+
+    return 0;
+#endif
 }
 

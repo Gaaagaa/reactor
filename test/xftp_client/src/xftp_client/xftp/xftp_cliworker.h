@@ -150,7 +150,11 @@ public:
     /**
      * @brief 是否允许自动提交心跳包。
      */
-    inline x_bool_t is_enable_auto_heartbeat(x_void_t) const { return m_xbt_heart_enable; }
+    inline x_bool_t is_enable_auto_heartbeat(x_void_t) const
+    {
+        return X_FALSE;
+        //return m_xbt_heart_enable;
+    }
 
     /**********************************************************/
     /**

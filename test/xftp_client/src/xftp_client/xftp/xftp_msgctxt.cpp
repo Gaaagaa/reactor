@@ -255,7 +255,7 @@ x_int32_t io_get_context(const x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen, 
     // 数据体长度
 
     xio_size = vx_ntohs(xio_nptr->io_size);
-    if ((IO_HDSIZE + xio_size) > (x_uint16_t)xut_io_dlen)
+    if ((IO_HDSIZE + xio_size) > xut_io_dlen)
     {
         return IOCTX_ERR_PART;
     }
@@ -410,7 +410,7 @@ x_int32_t io_context_rinfo(const x_uchar_t * xct_io_dptr, x_uint32_t xut_io_dlen
     // 数据体长度
 
     xio_size = vx_ntohs(xio_nptr->io_size);
-    if ((IO_HDSIZE + xio_size) > (x_uint16_t)xut_io_dlen)
+    if ((IO_HDSIZE + xio_size) > xut_io_dlen)
     {
         return IOCTX_ERR_PART;
     }
