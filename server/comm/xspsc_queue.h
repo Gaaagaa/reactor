@@ -247,7 +247,7 @@ private:
      */
     x_chunk_ptr_t alloc_chunk(void)
     {
-        x_chunk_alloc_t  xchunk_allocator(*(x_allocator_t *)this);
+        x_chunk_alloc_t xchunk_allocator(*(x_allocator_t *)this);
 
         x_chunk_ptr_t xchunk_ptr = xchunk_allocator.allocate(1);
         XASSERT(nullptr != xchunk_ptr);
@@ -283,7 +283,7 @@ private:
             if (nullptr != xchunk_ptr->xet_array)
                 x_allocator_t::deallocate(xchunk_ptr->xet_array, _En);
 
-            x_chunk_alloc_t  xchunk_allocator(*(x_allocator_t *)this);
+            x_chunk_alloc_t xchunk_allocator(*(x_allocator_t *)this);
             xchunk_allocator.deallocate(xchunk_ptr, 1);
         }
     }
