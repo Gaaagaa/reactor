@@ -72,7 +72,7 @@ x_uint16_t vx_htons(x_uint16_t xut_short)
 /**
  * @brief 等效于 伯克利套接字 API 的 ntohl() 接口。
  */
-x_ulong_t vx_ntohl(x_ulong_t xut_long)
+x_uint32_t vx_ntohl(x_uint32_t xut_long)
 {
     return ntohl(xut_long);
 }
@@ -81,7 +81,7 @@ x_ulong_t vx_ntohl(x_ulong_t xut_long)
 /**
  * @brief 等效于 伯克利套接字 API 的 htonl() 接口。
  */
-x_ulong_t vx_htonl(x_ulong_t xut_long)
+x_uint32_t vx_htonl(x_uint32_t xut_long)
 {
     return htonl(xut_long);
 }

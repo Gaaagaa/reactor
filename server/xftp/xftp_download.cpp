@@ -163,8 +163,6 @@ x_int32_t x_ftp_download_t::post_res_chunk(x_uint16_t xut_seqn, x_int64_t xit_of
         //======================================
         // 参数有效校验
 
-        STD_TRACE("[ORG]xit_offset = %lld, xut_rdsize = %d", xit_offset, xut_rdsize);
-
         if (!m_xio_fstream.is_open() || (xut_rdsize <= 0))
         {
             LOGE("[fd:%d]!m_xio_fstream.is_open() || (xut_rdsize[%d] <= 0)",
@@ -193,21 +191,23 @@ x_int32_t x_ftp_download_t::post_res_chunk(x_uint16_t xut_seqn, x_int64_t xit_of
         }
 
         //======================================
-        // 读取数据
+        // 设置数据体信息[ 块偏移 8bytes + 块大小 4bytes + 块数据 xut_rdsize ]
 
         x_tcp_io_message_t xio_message(IO_HDSIZE + sizeof(x_int64_t) + sizeof(x_uint32_t) + xut_rdsize);
+
         x_uchar_t * xct_dptr = xio_message.data() + IO_HDSIZE;
 
-        *(x_ullong_t *)(xct_dptr) = vx_htonll(xit_offset);
-        xct_dptr += sizeof(x_ullong_t);
+        // 文件块偏移位置
+        *(x_int64_t *)(xct_dptr) = (x_int64_t)vx_htonll((x_ullong_t)xit_offset);
+        xct_dptr += sizeof(x_int64_t);
 
-        *(x_ulong_t *)(xct_dptr) = vx_htonl(xut_rdsize);
-        xct_dptr += sizeof(x_ulong_t);
+        // 文件块大小
+        *(x_uint32_t *)(xct_dptr) = vx_htonl(xut_rdsize);
+        xct_dptr += sizeof(x_uint32_t);
 
-        // m_xio_fstream.seekg(xit_offset, std::ios::beg);
+        // 读取文件块数据
+        m_xio_fstream.seekg(xit_offset, std::ios::beg);
         m_xio_fstream.read((x_char_t *)xct_dptr, xut_rdsize);
-
-        STD_TRACE("HEX : %s", LOG_HEX(xio_message.data() + IO_HDSIZE, 64));
 
         //======================================
         // 设置应答消息的头部信息后，加入到消息应答队列
@@ -219,8 +219,8 @@ x_int32_t x_ftp_download_t::post_res_chunk(x_uint16_t xut_seqn, x_int64_t xit_of
         xio_msgctxt.io_dptr = X_NULL; // 设置为 X_NULL 的时候，则不进行数据拷贝操作
 
         XVERIFY(IOCTX_ERR_OK == io_set_context(xio_message.data(), xio_message.capacity(), &xio_msgctxt));
-
         xio_message.reset(IO_HDSIZE + xio_msgctxt.io_size, 0);
+
         push_res_xmsg(std::move(xio_message));
 
         //======================================
