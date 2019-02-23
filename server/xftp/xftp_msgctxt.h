@@ -61,13 +61,13 @@ x_uint32_t vx_htonl(x_uint32_t xut_long);
 /**
  * @brief 字节序转换：64 位整数从 网络字节序 转成 主机字节序。
  */
-x_ullong_t vx_ntohll(x_ullong_t xult_llong);
+x_uint64_t vx_ntohll(x_uint64_t xult_llong);
 
 /**********************************************************/
 /**
  * @brief 字节序转换：64 位整数从 主机字节序 转成 网络字节序。
  */
-x_ullong_t vx_htonll(x_ullong_t xult_llong);
+x_uint64_t vx_htonll(x_uint64_t xult_llong);
 
 ////////////////////////////////////////////////////////////////////////////////
 

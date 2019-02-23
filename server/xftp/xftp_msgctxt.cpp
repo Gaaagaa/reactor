@@ -107,19 +107,19 @@ static inline x_bool_t is_little_endian(void)
 /**
  * @brief 字节序转换：64 位整数从 网络字节序 转成 主机字节序。
  */
-x_ullong_t vx_ntohll(x_ullong_t xult_llong)
+x_uint64_t vx_ntohll(x_uint64_t xult_llong)
 {
 #ifdef _MSC_VER
     static x_bool_t xbt_little_endian = is_little_endian();
     if (xbt_little_endian)
-        return (((x_ullong_t)ntohl((x_ulong_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
-                ((x_ullong_t)ntohl((x_ulong_t)(xult_llong >> 32)));
+        return (((x_uint64_t)ntohl((x_uint32_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
+                ((x_uint64_t)ntohl((x_uint32_t)(xult_llong >> 32)));
     else
         return xult_llong;
 #else // !_MSC_VER
 #if (__BYTE_ORDER == __LITTLE_ENDIAN)
-    return (((x_ullong_t)ntohl((x_ulong_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
-            ((x_ullong_t)ntohl((x_ulong_t)(xult_llong >> 32)));
+    return (((x_uint64_t)ntohl((x_uint32_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
+            ((x_uint64_t)ntohl((x_uint32_t)(xult_llong >> 32)));
 #else // (__BYTE_ORDER == __BIG_ENDIAN)
     return xult_llong;
 #endif // (__BYTE_ORDER == __LITTLE_ENDIAN)
@@ -130,19 +130,19 @@ x_ullong_t vx_ntohll(x_ullong_t xult_llong)
 /**
  * @brief 字节序转换：64 位整数从 主机字节序 转成 网络字节序。
  */
-x_ullong_t vx_htonll(x_ullong_t xult_llong)
+x_uint64_t vx_htonll(x_uint64_t xult_llong)
 {
 #ifdef _MSC_VER
     static x_bool_t xbt_little_endian = is_little_endian();
     if (xbt_little_endian)
-        return (((x_ullong_t)htonl((x_ulong_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
-                ((x_ullong_t)htonl((x_ulong_t)(xult_llong >> 32)));
+        return (((x_uint64_t)htonl((x_uint32_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
+                ((x_uint64_t)htonl((x_uint32_t)(xult_llong >> 32)));
     else
         return xult_llong;
 #else // !_MSC_VER
 #if (__BYTE_ORDER == __LITTLE_ENDIAN)
-    return (((x_ullong_t)htonl((x_ulong_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
-            ((x_ullong_t)htonl((x_ulong_t)(xult_llong >> 32)));
+    return (((x_uint64_t)htonl((x_uint32_t)(xult_llong & 0x00000000FFFFFFFFLL))) << 32) |
+            ((x_uint64_t)htonl((x_uint32_t)(xult_llong >> 32)));
 #else // (__BYTE_ORDER == __BIG_ENDIAN)
     return xult_llong;
 #endif // (__BYTE_ORDER == __LITTLE_ENDIAN)
