@@ -131,7 +131,6 @@ private:
         x_iokeytype_t  xkey_sockfd;  ///< 存活检测套接字描述符（索引键）
         x_iochannel_t  xioc_handle;  ///< 套接字描述符所关联的工作句柄
         x_timestamp_t  xtms_kalive;  ///< 最新的活动（保活）时间戳
-        x_timestamp_t  xtms_verify;  ///< 最后校验操作的时间戳
 
         x_io_ndesc_t(void)
         {
@@ -140,13 +139,11 @@ private:
 
         x_io_ndesc_t(x_iokeytype_t xkey_sockfd,
                      x_iochannel_t xioc_handle,
-                     x_timestamp_t xtms_kalive,
-                     x_timestamp_t xtms_verify)
+                     x_timestamp_t xtms_kalive)
         {
             this->xkey_sockfd = xkey_sockfd;
             this->xioc_handle = xioc_handle;
             this->xtms_kalive = xtms_kalive;
-            this->xtms_verify = xtms_verify;
         }
 
         x_io_ndesc_t & operator = (const x_io_ndesc_t & xobject)

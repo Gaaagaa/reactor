@@ -248,6 +248,7 @@ x_void_t x_tcp_io_keepalive_t::update_xmap_ndesc(void)
             {
                 m_xmap_kalive.erase(itfind->second.xtms_kalive);
                 XVERIFY(insert_tskey(m_xmap_kalive, xevent.xtms_kalive, itfind->second.xkey_sockfd));
+                itfind->second.xioc_handle = xevent.xioc_handle;
                 itfind->second.xtms_kalive = xevent.xtms_kalive;
             }
             else
@@ -256,7 +257,6 @@ x_void_t x_tcp_io_keepalive_t::update_xmap_ndesc(void)
                 xndesc.xkey_sockfd = xevent.xkey_sockfd;
                 xndesc.xioc_handle = xevent.xioc_handle;
                 xndesc.xtms_kalive = xevent.xtms_kalive;
-                xndesc.xtms_verify = 0;
 
                 XVERIFY(insert_tskey(m_xmap_kalive, xndesc.xtms_kalive, xndesc.xkey_sockfd));
             }
