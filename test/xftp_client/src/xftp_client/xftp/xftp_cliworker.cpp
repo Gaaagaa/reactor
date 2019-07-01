@@ -357,7 +357,7 @@ x_void_t x_ftp_cliworker_t::thread_send_run(void)
         if (0 == xit_error)
         {
             x_io_msgctxt_t xio_msgctxt;
-            io_get_context((x_uchar_t *)xio_msghead_ptr, xut_iolen, &xio_msgctxt);
+            io_context_rinfo((x_uchar_t *)xio_msghead_ptr, xut_iolen, &xio_msgctxt);
             io_sended_msgctxt(xio_msgctxt);
         }
         else
@@ -483,52 +483,6 @@ x_void_t x_ftp_cliworker_t::thread_recv_run(void)
  */
 x_int32_t x_ftp_cliworker_t::io_recved(x_uchar_t * const xct_io_dptr, x_uint32_t & xut_io_dlen)
 {
-#if 0
-    x_int32_t xit_error = 0;
-
-    x_uint32_t xut_dlen = xut_io_dlen;
-
-    do
-    {
-        // 查找数据包前缀
-        x_int32_t xit_vpos = io_find_ldcode(xct_io_dptr, xut_dlen);
-
-        // 若无前缀，为非法数据包，立即判定此为恶意连接，终止操作
-        if (-1 == xit_vpos)
-        {
-            STD_TRACE("io_find_ldcode(xct_io_dptr, xut_dlen[%d]) return -1", xut_dlen);
-
-            xut_io_dlen = 0xFFFFFFFF;
-            xit_error = -1;
-            break;
-        }
-
-        x_io_msgctxt_t xio_msgctxt;
-
-        // 数据解包操作（逐个数据包的读取和投递工作）
-        x_int32_t xit_read_pos = xit_vpos;
-        while (xit_read_pos < (x_int32_t)xut_dlen)
-        {
-            // 查找缓存中的首个数据包
-            xit_vpos = io_find_context(xct_io_dptr + xit_read_pos, xut_dlen - xit_read_pos, &xio_msgctxt);
-            if (-1 == xit_vpos)
-            {
-                STD_TRACE("io_find_context(xct_io_dptr + xit_read_pos[%d], xut_dlen[%d] - xit_read_pos[%d], ...) return -1",
-                          xit_read_pos, xut_dlen, xit_read_pos);
-                break;
-            }
-
-            // 投递分包
-            io_recved_msgctxt(xio_msgctxt);
-
-            xit_read_pos += (xit_vpos + IO_HDSIZE + xio_msgctxt.io_size);
-        }
-
-        xut_io_dlen = xit_read_pos;
-    } while (0);
-
-    return xit_error;
-#else
     x_uchar_t * xct_dptr = (x_uchar_t *)xct_io_dptr;
     x_uint32_t  xut_dlen = xut_io_dlen;
     x_int32_t   xit_vpos = -1;
@@ -555,6 +509,5 @@ x_int32_t x_ftp_cliworker_t::io_recved(x_uchar_t * const xct_io_dptr, x_uint32_t
     xut_io_dlen = (x_uint32_t)(xct_dptr - xct_io_dptr);
 
     return 0;
-#endif
 }
 

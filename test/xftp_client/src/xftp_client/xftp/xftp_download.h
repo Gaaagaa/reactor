@@ -24,6 +24,7 @@
 #define __XFTP_DOWNLOAD_H__
 
 #include "xftp_cliworker.h"
+#include <fstream>
 
 ////////////////////////////////////////////////////////////////////////////////
 // x_ftp_download_t
@@ -135,14 +136,13 @@ protected:
      * @brief 投递文件块的下载请求。
      *
      * @param [in ] xit_offset  : 文件块偏移位置。
-     * @param [in ] xut_chksize : 文件块大小。
-     * @param [in ] xbt_pause   : 暂停标识。
+     * @param [in ] xit_chksize : 文件块大小。
      *
      * @return x_int32_t
      *         - 成功，返回 0；
      *         - 失败，返回 错误码。
      */
-    x_int32_t post_req_chunk(x_int64_t xit_offset, x_uint32_t xut_chksize, x_bool_t xbt_pause);
+    x_int32_t post_req_chunk(x_int64_t xit_offset, x_int64_t xit_chksize);
 
     // io event handlers
 protected:
@@ -172,13 +172,13 @@ protected:
 
     // data members
 protected:
-    x_bool_t     m_xbt_login;    ///< 标识登录成功（网络连接建立成功）
+    x_bool_t      m_xbt_login;    ///< 标识登录成功（网络连接建立成功）
 
-    std::string  m_xstr_fpath;   ///< 文件路径名
-    x_int64_t    m_xit_fsize;    ///< 文件大小
-    x_bool_t     m_xbt_pause;    ///< 暂停标识
+    std::string   m_xstr_fpath;   ///< 文件路径名
+    x_int64_t     m_xit_fsize;    ///< 文件大小
+    x_bool_t      m_xbt_pause;    ///< 暂停标识
 
-    x_handle_t   m_xht_fstream;  ///< 文件句柄
+    std::ofstream m_xht_fstream;  ///< 文件写操作对象
 };
 
 ////////////////////////////////////////////////////////////////////////////////

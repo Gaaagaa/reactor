@@ -132,6 +132,9 @@
     <ClInclude Include="xftp\xftp_download.h">
       <Filter>xftp</Filter>
     </ClInclude>
+    <ClInclude Include="vxFTaskListCtrl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="XftpClientDlg.cpp">
@@ -190,6 +193,9 @@
     </ClCompile>
     <ClCompile Include="xftp\xftp_download.cpp">
       <Filter>xftp</Filter>
+    </ClCompile>
+    <ClCompile Include="vxFTaskListCtrl.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

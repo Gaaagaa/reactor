@@ -46,6 +46,7 @@ public:
     typedef enum emConstValue
     {
         ECV_MAX_CHUNK_SIZE = 60 * 1024,  ///< IO 操作的文件块最大长度
+        ECV_SUG_CHUNK_SIZE = 32 * 1024,  ///< 建议的 IO 操作文件块长度
     } emConstValue;
 
     /**
@@ -109,15 +110,15 @@ protected:
     /**
      * @brief 投递 “下载文件块” 的应答消息（将文件块数据传输给客户端）。
      * 
-     * @param [in ] xut_seqn   : 应答消息的流水号。
-     * @param [in ] xit_offset : 读取文件数据的起始偏移位置。
-     * @param [in ] xut_rdsize : 读取文件块的最大数据量。
+     * @param [in    ] xut_seqn   : 应答消息的流水号。
+     * @param [in    ] xit_offset : 读取文件数据的起始偏移位置。
+     * @param [in,out] xut_rdsize : 读取文件块的最大数据量；回参时，表示实际读取的数据量。
      * 
      * @return x_int32_t
      *         - 成功，返回 0；
      *         - 失败，返回 错误码。
      */
-    x_int32_t post_res_chunk(x_uint16_t xut_seqn, x_int64_t xit_offset, x_uint32_t xut_rdsize);
+    x_int32_t post_res_chunk(x_uint16_t xut_seqn, x_int64_t xit_offset, x_uint32_t & xut_rdsize);
 
     // requested message handlers
 protected:
@@ -166,6 +167,9 @@ private:
     x_int64_t     m_xit_fsize;      ///< 文件总大小
 
     std::ifstream m_xio_fstream;    ///< 文件数据读取操作的文件流对象
+    x_int64_t     m_xit_offset_beg; ///< 记录当前请求文件块的起始偏移位置
+    x_int64_t     m_xit_offset_cur; ///< 记录当前请求文件块的读取偏移位置
+    x_int64_t     m_xit_chunk_size; ///< 记录当前请求文件块的大小
     x_bool_t      m_xbt_pause;      ///< 暂停标识
 };
 

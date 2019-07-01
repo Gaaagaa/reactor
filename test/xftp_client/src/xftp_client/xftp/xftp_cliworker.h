@@ -152,8 +152,7 @@ public:
      */
     inline x_bool_t is_enable_auto_heartbeat(x_void_t) const
     {
-        return X_FALSE;
-        //return m_xbt_heart_enable;
+        return m_xbt_heart_enable;
     }
 
     /**********************************************************/

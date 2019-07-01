@@ -37,7 +37,6 @@ x_ftp_download_t::x_ftp_download_t(void)
     , m_xstr_fpath("")
     , m_xit_fsize(0)
     , m_xbt_pause(X_FALSE)
-    , m_xht_fstream(INVALID_HANDLE_VALUE)
 {
 
 }
@@ -206,10 +205,9 @@ x_void_t x_ftp_download_t::logout(void)
 
     shutdown();
 
-    if (INVALID_HANDLE_VALUE != m_xht_fstream)
+    if (m_xht_fstream.is_open())
     {
-        CloseHandle(m_xht_fstream);
-        m_xht_fstream = INVALID_HANDLE_VALUE;
+        m_xht_fstream.close();
     }
 }
 
@@ -224,18 +222,17 @@ x_void_t x_ftp_download_t::logout(void)
  * @brief 投递文件块的下载请求。
  *
  * @param [in ] xit_offset  : 文件块偏移位置。
- * @param [in ] xut_chksize : 文件块大小。
- * @param [in ] xbt_pause   : 暂停标识。
+ * @param [in ] xit_chksize : 文件块大小。
  *
  * @return x_int32_t
  *         - 成功，返回 0；
  *         - 失败，返回 错误码。
  */
-x_int32_t x_ftp_download_t::post_req_chunk(x_int64_t xit_offset, x_uint32_t xut_chksize, x_bool_t xbt_pause)
+x_int32_t x_ftp_download_t::post_req_chunk(x_int64_t xit_offset, x_int64_t xit_chksize)
 {
-    // [文件读取偏移位置 8byte + 请求的文件块长度 4byte + 暂停标识 4byte]
-    x_uint32_t xut_io_size = sizeof(x_int64_t) + sizeof(x_uint32_t) + sizeof(x_uint32_t);
-    x_uchar_t  xct_io_dptr[sizeof(x_int64_t) + sizeof(x_uint32_t) + sizeof(x_uint32_t)];
+    // [文件读取偏移位置 8byte + 请求的文件块长度 8byte]
+    x_uint32_t xut_io_size = sizeof(x_int64_t) + sizeof(x_int64_t);
+    x_uchar_t  xct_io_dptr[sizeof(x_int64_t) + sizeof(x_int64_t)];
 
     x_uchar_t * xct_vptr = xct_io_dptr;
 
@@ -244,11 +241,8 @@ x_int32_t x_ftp_download_t::post_req_chunk(x_int64_t xit_offset, x_uint32_t xut_
     xct_vptr += sizeof(x_int64_t);
 
     // 请求的文件块长度
-    *(x_uint32_t *)(xct_vptr) = (x_uint32_t)vx_htonl(xut_chksize);
+    *(x_int64_t *)(xct_vptr) = (x_int64_t)vx_htonll(xit_chksize);
     xct_vptr += sizeof(x_uint32_t);
-
-    // 暂停标识
-    *(x_uint32_t *)(xct_vptr) = (x_uint32_t)vx_htonl(xbt_pause);
 
     // IO 上下文描述信息
     x_io_msgctxt_t xio_msgctxt;
@@ -298,15 +292,9 @@ x_int32_t x_ftp_download_t::iocmd_login(x_uint16_t xut_seqn, x_uchar_t * xct_dpt
             break;
         }
 
-        XASSERT(INVALID_HANDLE_VALUE == m_xht_fstream);
-        m_xht_fstream = CreateFileA(m_xstr_fpath.c_str(),
-                                    GENERIC_WRITE,
-                                    FILE_SHARE_WRITE | FILE_SHARE_READ,
-                                    NULL,
-                                    CREATE_ALWAYS,
-                                    FILE_ATTRIBUTE_NORMAL,
-                                    NULL);
-        if (INVALID_HANDLE_VALUE == m_xht_fstream)
+        XASSERT(!m_xht_fstream.is_open());
+        m_xht_fstream.open(m_xstr_fpath.c_str(), std::ios::out | std::ios::binary);
+        if (!m_xht_fstream.is_open())
         {
             xit_error = -1;
             break;
@@ -315,7 +303,7 @@ x_int32_t x_ftp_download_t::iocmd_login(x_uint16_t xut_seqn, x_uchar_t * xct_dpt
         //======================================
         // 投递下载请求
 
-        post_req_chunk(0LL, ECV_NOR_CHUNK_SIZE, X_FALSE);
+        post_req_chunk(0LL, m_xit_fsize);
 
         //======================================
 
@@ -357,7 +345,7 @@ x_int32_t x_ftp_download_t::iocmd_chunk(x_uint16_t xut_seqn, x_uchar_t * xct_dpt
         //======================================
         // 错误码判断
 
-        if ((INVALID_HANDLE_VALUE == m_xht_fstream) || (X_NULL == xct_dptr) || (xut_size < sizeof(x_int32_t)))
+        if (!m_xht_fstream.is_open() || (X_NULL == xct_dptr) || (xut_size < sizeof(x_int32_t)))
         {
             xit_error = -1;
             break;
@@ -391,39 +379,9 @@ x_int32_t x_ftp_download_t::iocmd_chunk(x_uint16_t xut_seqn, x_uchar_t * xct_dpt
         //======================================
         // 写入文件块数据
 
-        LARGE_INTEGER xoffset;
-        xoffset.QuadPart = xit_offset;
-        SetFilePointerEx(m_xht_fstream, xoffset, X_NULL, FILE_BEGIN);
-
-        xit_error = 0;
-
-        x_ulong_t xut_count = 0;
-        while (xut_count < xut_lchunk)
-        {
-            x_ulong_t xut_wbytes = 0;
-            if (!WriteFile(m_xht_fstream, xct_vptr + xut_count, xut_lchunk - xut_count, &xut_wbytes, NULL))
-            {
-                xit_error = -1;
-                break;
-            }
-
-            xut_count += xut_wbytes;
-            if (0 == xut_wbytes)
-                break;
-        }
-
-        if (xut_count != xut_lchunk)
-        {
-            xit_error = -1;
-            break;
-        }
-
-        if (0 != xit_error)
-        {
-            break;
-        }
-
-        FlushFileBuffers(m_xht_fstream);
+        m_xht_fstream.seekp(xit_offset, std::ios::beg);
+        m_xht_fstream.write((x_char_t *)xct_vptr, xut_lchunk);
+        m_xht_fstream.flush();
 
         xbt_write = X_TRUE;
 

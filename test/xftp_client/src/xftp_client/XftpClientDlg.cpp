@@ -36,6 +36,7 @@
 
 CXftpClientDlg::CXftpClientDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_XFTP_CLIENT_DIALOG, pParent)
+    , m_xut_dlseqno(0)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -184,7 +185,7 @@ x_void_t CXftpClientDlg::reset_msg_handler(void)
  */
 x_void_t CXftpClientDlg::on_msg_wcli_ioerr(x_uint32_t xut_size, x_pvoid_t xpvt_dptr)
 {
-    m_xftp_client.logout();
+    OnBnClickedBtnSvrdown();
 }
 
 /**********************************************************/
@@ -215,7 +216,7 @@ x_void_t CXftpClientDlg::on_msg_wcli_flist(x_uint32_t xut_size, x_pvoid_t xpvt_d
 
         x_int32_t xit_item = m_wndListFiles.InsertItem(m_wndListFiles.GetItemCount(), szText);
         m_wndListFiles.SetItemText(xit_item, 0, szText);
-        
+
         strText.Format(TEXT("%d"), itlst->second);
         m_wndListFiles.SetItemText(xit_item, 1, strText);
     }
@@ -336,8 +337,8 @@ LRESULT CXftpClientDlg::OnKickIdle(WPARAM wParam, LPARAM lParam)
     BOOL bWork  = m_xftp_client.is_startup();
     BOOL bLogin = m_xftp_client.is_login();
 
-    BOOL bSelItemF = (m_wndListFiles.GetSelectedCount() > 0) && bLogin;
-    BOOL bSelItemT = (m_wndListTasks.GetSelectedCount() > 0) && bLogin;
+    BOOL bSelItemF = bLogin && (1 == m_wndListFiles.GetSelectedCount());
+    BOOL bSelItemT = bLogin && (1 == m_wndListTasks.GetSelectedCount());
 
     GetDlgItem(IDC_IPA_IPHOST )->EnableWindow(!bWork);
     GetDlgItem(IDC_EDIT_PORT  )->EnableWindow(!bWork);
@@ -347,7 +348,7 @@ LRESULT CXftpClientDlg::OnKickIdle(WPARAM wParam, LPARAM lParam)
     GetDlgItem(IDC_BTN_FLIST    )->EnableWindow(bLogin);
     GetDlgItem(IDC_BTN_ENLOAD   )->EnableWindow(bSelItemF);
     GetDlgItem(IDC_BTN_DOWNPAUSE)->EnableWindow(bSelItemT);
-    // GetDlgItem(IDC_BTN_DOWNSTOP )->EnableWindow(bSelItemT);
+    GetDlgItem(IDC_BTN_DOWNSTOP )->EnableWindow(bSelItemT);
     GetDlgItem(IDC_BTN_LOCALPATH)->EnableWindow(!bLogin);
 
     return 0;
@@ -409,6 +410,7 @@ void CXftpClientDlg::OnBnClickedBtnSvrcnt()
 void CXftpClientDlg::OnBnClickedBtnSvrdown()
 {
     m_xftp_client.logout();
+    m_wndListFiles.DeleteAllItems();
 }
 
 /**********************************************************/
@@ -442,41 +444,46 @@ void CXftpClientDlg::OnBnClickedBtnEnload()
         return;
     }
 
-    CString strText;
-
     //======================================
-    // 文件路径名 和 文件大小
+    // 文件名 和 文件大小
 
     POSITION pos = m_wndListFiles.GetFirstSelectedItemPosition();
     int nItem = m_wndListFiles.GetNextSelectedItem(pos);
-
-    GetDlgItem(IDC_EDIT_LOCALPATH)->GetWindowText(strText);
-    strText += m_wndListFiles.GetItemText(nItem, 0);
-
-    x_char_t xszt_fpath[TEXT_LEN_1K] = { 0 };
-    TextToUtf8(xszt_fpath, TEXT_LEN_1K, (LPCTSTR)strText);
-
-    strText = m_wndListFiles.GetItemText(nItem, 1);
-    x_int64_t xit_fsize = _tstoll(strText);
-
-    //======================================
-
-    // IP
-    GetDlgItem(IDC_IPA_IPHOST)->GetWindowText(strText);
-    x_char_t xszt_host[TEXT_LEN_64] = { 0 };
-    TextToAnsi(xszt_host, TEXT_LEN_64, (LPCTSTR)strText);
-
-    // PORT
-    GetDlgItem(IDC_EDIT_PORT)->GetWindowText(strText);
-    x_uint16_t xwt_port = (x_uint16_t)_tstoi(strText);
-
-    // 发起网络连接
-    x_int32_t xit_error = m_xftp_dload.login(xszt_host, xwt_port, xszt_fpath, xit_fsize);
-    if (0 != xit_error)
+    if (-1 == nItem)
     {
-        ::MessageBox(m_hWnd, TEXT("连接服务终端失败！"), TEXT("系统提示"), MB_ICONINFORMATION | MB_OK);
         return;
     }
+
+    CString strFname = m_wndListFiles.GetItemText(nItem, 0);
+    CString strFsize = m_wndListFiles.GetItemText(nItem, 1);
+
+    //======================================
+    // 判断是否重复
+
+    int nCount = m_wndListTasks.GetItemCount();
+    for (int nIter = 0; nIter < nCount; ++nIter)
+    {
+        CString strText = m_wndListTasks.GetItemText(nIter, 0);
+        if (strText == strFname)
+        {
+            ::MessageBox(m_hWnd,
+                         TEXT("下载任务列表中已存在该文件，无需重复添加！"),
+                         TEXT("系统提示"),
+                         MB_ICONINFORMATION | MB_OK);
+            return;
+        }
+    }
+
+    //======================================
+    // 添加任务
+
+    nItem = m_wndListTasks.InsertItem(m_wndListTasks.GetItemCount(), strFname);
+
+    m_wndListTasks.SetItemText(nItem, 0, strFname);
+    m_wndListTasks.SetItemText(nItem, 1, strFsize);
+
+    m_wndListTasks.SetItemData(nItem, ++m_xut_dlseqno);
+    m_xut_dlseqno = (m_xut_dlseqno < 0x00FFFFFF) ? m_xut_dlseqno : 0;
 
     //======================================
 }
@@ -496,7 +503,7 @@ void CXftpClientDlg::OnBnClickedBtnDownpause()
  */
 void CXftpClientDlg::OnBnClickedBtnDownstop()
 {
-    m_xftp_dload.logout();
+
 }
 
 /**********************************************************/

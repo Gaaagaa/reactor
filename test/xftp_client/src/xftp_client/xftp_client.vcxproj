@@ -226,6 +226,7 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="vxConsole.h" />
     <ClInclude Include="vxDC.h" />
+    <ClInclude Include="vxFTaskListCtrl.h" />
     <ClInclude Include="vxHeaderCtrl.h" />
     <ClInclude Include="vxListCtrl.h" />
     <ClInclude Include="vxWinHelpFunc.h" />
@@ -287,6 +288,7 @@
     </ClCompile>
     <ClCompile Include="vxConsole.cpp" />
     <ClCompile Include="vxDC.cpp" />
+    <ClCompile Include="vxFTaskListCtrl.cpp" />
     <ClCompile Include="vxHeaderCtrl.cpp" />
     <ClCompile Include="vxListCtrl.cpp" />
     <ClCompile Include="vxWinHelpFunc.cpp" />

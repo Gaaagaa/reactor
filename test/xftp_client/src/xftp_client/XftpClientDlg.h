@@ -23,8 +23,8 @@
 #pragma once
 
 #include "vxListCtrl.h"
+#include "vxFTaskListCtrl.h"
 #include "xftp/xftp_client.h"
-#include "xftp/xftp_download.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // CXftpClientDlg dialog
@@ -89,10 +89,10 @@ protected:
     SIZE    m_szInit;  ///< 窗口初始尺寸
 
     vxListCtrl      m_wndListFiles;  ///< 文件列表控件
-    vxListCtrl      m_wndListTasks;  ///< 下载任务列表控件
+    vxFTaskListCtrl m_wndListTasks;  ///< 下载任务列表控件
 
-    x_ftp_client_t    m_xftp_client;   ///< 客户端的网络连接工作对象
-    x_ftp_download_t  m_xftp_dload;
+    x_ftp_client_t    m_xftp_client; ///< 客户端的网络连接工作对象
+    x_uint32_t        m_xut_dlseqno; ///< 下载任务的流水号生成器
 
 	// message map handlers
 protected:

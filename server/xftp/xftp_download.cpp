@@ -38,6 +38,10 @@ x_ftp_download_t::x_ftp_download_t(x_handle_t xht_manager, x_sockfd_t xfdt_sockf
     , m_xstr_fname("")
     , m_xstr_fpath("")
     , m_xit_fsize(0)
+    , m_xit_offset_beg(0)
+    , m_xit_offset_cur(0)
+    , m_xit_chunk_size(0)
+    , m_xbt_pause(X_TRUE)
 {
 
 }
@@ -145,15 +149,15 @@ x_int32_t x_ftp_download_t::io_event_destroyed(void)
 /**
  * @brief 投递 “下载文件块” 的应答消息（将文件块数据传输给客户端）。
  * 
- * @param [in ] xut_seqn   : 应答消息的流水号。
- * @param [in ] xit_offset : 读取文件数据的起始偏移位置。
- * @param [in ] xut_rdsize : 读取文件块的最大数据量。
+ * @param [in    ] xut_seqn   : 应答消息的流水号。
+ * @param [in    ] xit_offset : 读取文件数据的起始偏移位置。
+ * @param [in,out] xut_rdsize : 读取文件块的最大数据量；回参时，表示实际读取的数据量。
  * 
  * @return x_int32_t
  *         - 成功，返回 0；
  *         - 失败，返回 错误码。
  */
-x_int32_t x_ftp_download_t::post_res_chunk(x_uint16_t xut_seqn, x_int64_t xit_offset, x_uint32_t xut_rdsize)
+x_int32_t x_ftp_download_t::post_res_chunk(x_uint16_t xut_seqn, x_int64_t xit_offset, x_uint32_t & xut_rdsize)
 {
     x_int32_t xit_error  = 0;
     x_bool_t  xbt_finish = X_FALSE;
@@ -342,32 +346,42 @@ x_int32_t x_ftp_download_t::iocmd_chunk(x_uint16_t xut_seqn, x_uchar_t * xct_dpt
         //======================================
         // 提取请求参数
 
-        // [文件读取偏移位置 8byte + 请求的文件块长度 4byte + 暂停标识 4byte]
+        // [文件读取偏移位置 8byte + 请求的文件块长度 8byte]
         if ((X_NULL == xct_dptr) ||
-            ((sizeof(x_int64_t) + sizeof(x_uint32_t) + sizeof(x_uint32_t)) != xut_size))
+            ((sizeof(x_int64_t) + sizeof(x_int64_t)) != xut_size))
         {
             LOGE("[fd:%d] xut_size == %d", get_sockfd(), xut_size);
             xit_error = -1;
             break;
         }
 
-        x_int64_t  xit_offset = (x_int64_t )vx_ntohll(*(x_ullong_t *)(xct_dptr));
-        x_uint32_t xut_rdsize = (x_uint32_t)vx_ntohl (*(x_ulong_t  *)(xct_dptr + sizeof(x_ullong_t)));
-        x_uint32_t xut_mpause = (x_uint32_t)vx_ntohl (*(x_ulong_t  *)(xct_dptr + sizeof(x_ullong_t) + sizeof(x_uint32_t)));
+        m_xit_offset_beg = (x_int64_t)vx_ntohll(*(x_uint64_t *)(xct_dptr));
+        m_xit_offset_cur = m_xit_offset_beg;
+        m_xit_chunk_size = (x_int64_t)vx_ntohll(*(x_uint64_t *)(xct_dptr + sizeof(x_int64_t)));
 
-        STD_TRACE("xit_offset = %lld, xut_rdsize = %d, xut_mpause = %d", xit_offset, xut_rdsize, xut_mpause);
+        m_xit_chunk_size = limit_bound(m_xit_chunk_size, 0, m_xit_fsize - m_xit_offset_beg);
+
+        STD_TRACE("m_xit_offset_beg = %lld, m_xit_chunk_size = %lld", m_xit_offset_beg, m_xit_chunk_size);
+
+        m_xbt_pause = X_FALSE;
 
         //======================================
 
-        m_xbt_pause = (0 != xut_mpause) ? X_TRUE : X_FALSE;
+        x_uint32_t xut_rdsize = limit_upper((x_uint32_t)ECV_SUG_CHUNK_SIZE,
+                                            m_xit_offset_beg + m_xit_chunk_size - m_xit_offset_cur);
 
-        xit_error = post_res_chunk(xut_seqn, xit_offset, xut_rdsize);
+        xit_error = post_res_chunk(xut_seqn, m_xit_offset_cur, xut_rdsize);
         if (0 != xit_error)
         {
-            LOGE("[fd:%d]post_res_chunk(xut_seqn[%d], xit_offset[%lld], xut_rdsize[%d]) return error : %d",
-                 get_sockfd(), xut_seqn, xit_offset, xut_rdsize, xit_error);
+            LOGE("[fd:%d]post_res_chunk(xut_seqn[%d], m_xit_offset_cur[%lld], xut_rdsize[%d]) return error : %d",
+                 get_sockfd(), xut_seqn, m_xit_offset_cur, xut_rdsize, xit_error);
             break;
         }
+
+        m_xit_offset_cur += xut_rdsize;
+
+        // 若完成文件块的传输，则设置暂停标识
+        m_xbt_pause = m_xit_offset_cur >= (m_xit_offset_beg + m_xit_chunk_size);
 
         //======================================
         xit_error = 0;
@@ -382,18 +396,13 @@ x_int32_t x_ftp_download_t::iocmd_chunk(x_uint16_t xut_seqn, x_uchar_t * xct_dpt
  */
 x_int32_t x_ftp_download_t::iocmd_pause(x_uint16_t xut_seqn, x_uchar_t * xct_dptr, x_uint32_t xut_size)
 {
-    if ((X_NULL != xct_dptr) && (sizeof(x_uint32_t) == xut_size))
-    {
-        m_xbt_pause = (0 != vx_ntohl(*(x_uint32_t *)xct_dptr)) ? X_TRUE : X_FALSE;
-    }
-
-    x_uint32_t xut_pause = vx_htonl((x_uint32_t)m_xbt_pause);
+    m_xbt_pause = X_TRUE;
 
     x_io_msgctxt_t xio_msgctxt;
     xio_msgctxt.io_seqn = xut_seqn;
     xio_msgctxt.io_cmid = CMID_DLOAD_PAUSE;
-    xio_msgctxt.io_size = sizeof(x_uint32_t);
-    xio_msgctxt.io_dptr = (x_uchar_t *)&xut_pause;
+    xio_msgctxt.io_size = 0;
+    xio_msgctxt.io_dptr = X_NULL;
 
     post_res_xmsg(xio_msgctxt);
 
@@ -443,6 +452,13 @@ x_int32_t x_ftp_download_t::iores_chunk(x_uint16_t xut_seqn, x_uchar_t * xct_dpt
     {
         //======================================
 
+        // 是否已经暂停
+        if (m_xbt_pause)
+        {
+            xit_error = 0;
+            break;
+        }
+
         // [文件读取偏移位置 8byte + 请求的文件块长度 4byte]
         if ((X_NULL == xct_dptr) ||
             (xut_size < (sizeof(x_int64_t) + sizeof(x_uint32_t))))
@@ -452,19 +468,25 @@ x_int32_t x_ftp_download_t::iores_chunk(x_uint16_t xut_seqn, x_uchar_t * xct_dpt
             break;
         }
 
-        x_int64_t  xit_offset = (x_int64_t )vx_ntohll(*(x_ullong_t *)(xct_dptr));
-        x_uint32_t xut_rdsize = (x_uint32_t)vx_ntohl (*(x_ulong_t  *)(xct_dptr + sizeof(x_ullong_t)));
-
-        xit_offset += xut_rdsize;
-
         //======================================
+        
+        x_uint32_t xut_rdsize = limit_upper((x_uint32_t)ECV_SUG_CHUNK_SIZE,
+                                            m_xit_offset_beg + m_xit_chunk_size - m_xit_offset_cur);
 
-        xit_error = post_res_chunk(xut_seqn, xit_offset, xut_rdsize);
+        xit_error = post_res_chunk(xut_seqn, m_xit_offset_cur, xut_rdsize);
         if (0 != xit_error)
         {
-            LOGE("[fd:%d]post_res_chunk(xut_seqn[%d], xit_offset[%lld], xut_rdsize[%d]) return error : %d",
-                 get_sockfd(), xut_seqn, xit_offset, xut_rdsize, xit_error);
+            LOGE("[fd:%d]post_res_chunk(xut_seqn[%d], m_xit_offset_cur[%lld], xut_rdsize[%d]) return error : %d",
+                 get_sockfd(), xut_seqn, m_xit_offset_cur, xut_rdsize, xit_error);
             break;
+        }
+
+        m_xit_offset_cur += xut_rdsize;
+
+        // 若完成文件块的传输，则设置暂停标识
+        if (!m_xbt_pause)
+        {
+            m_xbt_pause = m_xit_offset_cur >= m_xit_offset_beg + m_xit_chunk_size;
         }
 
         //======================================
